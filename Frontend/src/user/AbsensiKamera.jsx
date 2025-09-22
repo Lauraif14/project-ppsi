@@ -1,21 +1,18 @@
-// src/components/AbsensiKamera.jsx
 import React, { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import api from '../api/axios';
 
-const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
+const AbsensiKamera = ({ mode, absensiId, onClose, setPesanDashboard }) => {
     const webcamRef = useRef(null);
     const [capturedImg, setCapturedImg] = useState(null);
     const [location, setLocation] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // Fungsi untuk mengambil foto
     const capture = useCallback(() => {
         const imageSrc = webcamRef.current.getScreenshot();
         setCapturedImg(imageSrc);
-
-        // Ambil lokasi Geografis
+        
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
@@ -31,7 +28,6 @@ const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
         }
     }, [webcamRef]);
 
-    // Fungsi untuk mengirim data absensi
     const handleSubmitAbsen = async () => {
         if (!capturedImg || !location) {
             setError('Silakan ambil foto dan pastikan lokasi terdeteksi.');
@@ -40,7 +36,6 @@ const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
         setLoading(true);
         setError('');
 
-        // Konversi base64 image ke Blob
         const blob = await fetch(capturedImg).then(res => res.blob());
         const file = new File([blob], "foto_absen.jpg", { type: "image/jpeg" });
 
@@ -48,17 +43,24 @@ const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
         formData.append('foto_absen', file);
         formData.append('latitude', location.latitude);
         formData.append('longitude', location.longitude);
-
+        
+        // Tentukan endpoint berdasarkan mode
+        let endpoint = '/absensi/masuk';
+        if (mode === 'keluar') {
+            endpoint = '/absensi/keluar';
+            formData.append('absensiId', absensiId);
+        }
+        
         try {
             const token = localStorage.getItem("token");
-            const response = await api.post('/absensi', formData, {
+            const response = await api.post(endpoint, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                     'Authorization': `Bearer ${token}`
                 }
             });
             setPesanDashboard(response.data.message);
-            onClose(); // Tutup modal setelah berhasil
+            onClose();
         } catch (err) {
             setError(err.response?.data?.message || 'Terjadi kesalahan.');
         } finally {
@@ -69,8 +71,8 @@ const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-2xl border-2 border-black shadow-lg text-center w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-4">Ambil Absen Piket</h2>
-
+                <h2 className="text-2xl font-bold mb-4 capitalize">Ambil Absen {mode}</h2>
+                
                 {capturedImg ? (
                     <img src={capturedImg} alt="Hasil capture" className="rounded-lg mb-4" />
                 ) : (
@@ -83,12 +85,12 @@ const AbsensiKamera = ({ onClose, setPesanDashboard }) => {
                 )}
 
                 {error && <p className="text-red-500 mb-4">{error}</p>}
-
+                
                 <div className="space-y-3">
                     {capturedImg ? (
                         <>
                             <button onClick={handleSubmitAbsen} disabled={loading} className="w-full py-3 bg-pink-500 text-white font-semibold rounded-lg">
-                                {loading ? 'Mengirim...' : 'Kirim Absen'}
+                                {loading ? 'Mengirim...' : `Kirim Absen ${mode.charAt(0).toUpperCase() + mode.slice(1)}`}
                             </button>
                             <button onClick={() => setCapturedImg(null)} className="w-full py-3 bg-gray-300 rounded-lg">
                                 Ambil Ulang
