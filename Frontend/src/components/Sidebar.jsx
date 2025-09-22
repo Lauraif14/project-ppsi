@@ -5,7 +5,7 @@ import { NavLink } from "react-router-dom";
 import { Home, ClipboardList, Calendar, BarChart3, Menu, Users } from "lucide-react";
 
 const menuItems = [
-  { id: "dashboard", label: "Dashboard", icon: <Home size={20} />, path: "/dashboard" },
+  { id: "dashboard", label: "Dashboard", icon: <Home size={20} />, path: "/admin-dashboard" },
   { id: "master", label: "Data Master", icon: <ClipboardList size={20} />, path: "/master" },
   { id: "jadwal", label: "Jadwal Piket", icon: <Calendar size={20} />, path: "/jadwal-piket" },
   { id: "laporan", label: "Laporan", icon: <BarChart3 size={20} />, path: "/laporan" },
