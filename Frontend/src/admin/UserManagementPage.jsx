@@ -1,5 +1,5 @@
 // src/pages/UserManagement.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { motion } from "framer-motion";
@@ -7,14 +7,45 @@ import { Pencil, Trash2, Plus } from "lucide-react";
 
 
 const UserManagement = () => {
-  // Dummy data awal (nanti bisa ambil dari API/backend)
-  const [users, setUsers] = useState([
-    { id: 1, name: "Dinas Pendidikan", username: "dinas.pendidikan", password: "1234" },
-    { id: 2, name: "Dinas Kesehatan", username: "dinas.kesehatan", password: "1234" },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [newUser, setNewUser] = useState({ name: "", username: "", password: "1234" });
+  const [newUser, setNewUser] = useState({ name: "", username: "", divisi: "" });
   const [editingUser, setEditingUser] = useState(null);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token'); // Ambil token dari localStorage
+      
+      const response = await fetch('http://localhost:5000/api/users', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setUsers(result.data);
+        setError(null);
+      } else {
+        setError(result.message || 'Error fetching users');
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
+      console.error('Error fetching users:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
   // Generate username otomatis dari nama
   const generateUsername = (name) => {
@@ -94,16 +125,16 @@ const UserManagement = () => {
                 <tr className="bg-gray-100 border-b-2 border-gray-300">
                   <th className="p-3 text-left">Nama</th>
                   <th className="p-3 text-left">Username</th>
-                  <th className="p-3 text-left">Password</th>
+                  <th className="p-3 text-left">Divisi</th>
                   <th className="p-3 text-center">Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
                   <tr key={user.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">{user.name}</td>
+                    <td className="p-3">{user.nama_lengkap}</td>
                     <td className="p-3">{user.username}</td>
-                    <td className="p-3">{user.password}</td>
+                    <td className="p-3">{user.divisi}</td>
                     <td className="p-3 flex justify-center gap-3">
                       <button
                         className="p-2 bg-yellow-400 rounded-lg border border-black hover:bg-yellow-500"
