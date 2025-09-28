@@ -1,16 +1,9 @@
 // src/pages/MasterPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Users, Package, Edit, Trash2, Upload, Plus } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-
-const dummyPengurus = [
-  { id: 1, name: "Ahmad Rizki", role: "Ketua" },
-  { id: 2, name: "Siti Nurhaliza", role: "Sekretaris" },
-  { id: 3, name: "Budi Santoso", role: "Bendahara" },
-  { id: 4, name: "Rina Marlina", role: "Anggota" },
-];
 
 const dummyInventaris = [
   { id: 1, item: "Kursi Plastik", quantity: 50 },
@@ -25,6 +18,50 @@ const MasterPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
 
+  // State untuk data pengurus dari database
+  const [pengurusData, setPengurusData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchPengurus = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        setError('Token tidak ditemukan. Silakan login kembali.');
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/users/pengurus', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setPengurusData(result.data);
+        setError(null);
+      } else {
+        setError(result.message || 'Error fetching pengurus');
+      }
+    } catch (err) {
+      setError('Failed to connect to server');
+      console.error('Error fetching pengurus:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load data saat component mount
+  useEffect(() => {
+    fetchPengurus();
+  }, []);
+
   const handleOpenModal = (type) => {
     setModalType(type);
     setShowModal(true);
@@ -35,7 +72,52 @@ const MasterPage = () => {
     setModalType("");
   };
 
-  const data = dataType === "pengurus" ? dummyPengurus : dummyInventaris;
+  // Gunakan data dari database untuk pengurus, dummy untuk inventaris
+  const data = dataType === "pengurus" ? pengurusData : dummyInventaris;
+
+  // Loading state
+  if (loading && dataType === "pengurus") {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
+        <div className="flex-1 flex flex-col">
+          <Navbar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading data pengurus...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && dataType === "pengurus") {
+    return (
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
+        <div className="flex-1 flex flex-col">
+          <Navbar />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                <p className="font-bold">Error</p>
+                <p>{error}</p>
+                <button 
+                  onClick={fetchPengurus}
+                  className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -131,59 +213,67 @@ const MasterPage = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {data.map((item, index) => (
-                    <tr
-                      key={item.id}
-                      className="hover:bg-gray-50 transition-colors duration-150"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {index + 1}
-                      </td>
-                      {dataType === "pengurus" ? (
-                        <>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-3">
-                                {item.name.charAt(0)}
+                  {data.length > 0 ? (
+                    data.map((item, index) => (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-gray-50 transition-colors duration-150"
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {index + 1}
+                        </td>
+                        {dataType === "pengurus" ? (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-gradient-to-r from-pink-400 to-pink-500 rounded-full flex items-center justify-center text-white text-sm font-semibold mr-3">
+                                  {item.nama_lengkap?.charAt(0) || 'N'}
+                                </div>
+                                <div className="text-sm font-medium text-gray-900">{item.nama_lengkap || 'N/A'}</div>
                               </div>
-                              <div className="text-sm font-medium text-gray-900">{item.name}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-pink-100 text-pink-800">
-                              {item.role}
-                            </span>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-green-500 rounded-lg flex items-center justify-center text-white mr-3">
-                                <Package size={16} />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-pink-100 text-pink-800">
+                                {item.jabatan || 'N/A'}
+                              </span>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-green-500 rounded-lg flex items-center justify-center text-white mr-3">
+                                  <Package size={16} />
+                                </div>
+                                <div className="text-sm font-medium text-gray-900">{item.item}</div>
                               </div>
-                              <div className="text-sm font-medium text-gray-900">{item.item}</div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                              {item.quantity} unit
-                            </span>
-                          </td>
-                        </>
-                      )}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex gap-2">
-                          <button className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors">
-                            <Edit size={16} />
-                          </button>
-                          <button className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                {item.quantity} unit
+                              </span>
+                            </td>
+                          </>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex gap-2">
+                            <button className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors">
+                              <Edit size={16} />
+                            </button>
+                            <button className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-4 text-center text-gray-500">
+                        {dataType === "pengurus" ? "Tidak ada data pengurus" : "Tidak ada data inventaris"}
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
