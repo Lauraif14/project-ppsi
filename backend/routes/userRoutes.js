@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const verifyToken = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const xlsx = require('xlsx');

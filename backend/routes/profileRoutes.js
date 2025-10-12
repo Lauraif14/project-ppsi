@@ -2,7 +2,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const db = require('../db');
-const verifyToken = require('../middleware/auth'); // Kita akan buat middleware ini
+const { verifyToken } = require('../middleware/auth'); // Kita akan buat middleware ini
 
 const router = express.Router();
 
