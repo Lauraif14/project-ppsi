@@ -2,7 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const db = require('../db');
-const verifyToken = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -19,6 +19,44 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// --- FUNGSI BARU UNTUK WATERMARK ---
+const addWatermark = async (filePath, latitude, longitude) => {
+    try {
+        // 1. Dapatkan nama lokasi dari koordinat menggunakan OpenCage API
+        const geoUrl = `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${process.env.OPENCAGE_API_KEY}`;
+        const response = await axios.get(geoUrl);
+        const locationName = response.data.results[0]?.formatted || 'Lokasi tidak ditemukan';
+
+        // 2. Buat gambar teks (watermark) menggunakan SVG
+        const text = `${locationName}\n${new Date().toLocaleString('id-ID')}`;
+        const svgImage = `
+        <svg width="400" height="80">
+          <style>
+          .title { fill: #fff; font-size: 14px; font-weight: bold; font-family: Arial, sans-serif; }
+          </style>
+          <rect x="0" y="0" width="100%" height="100%" fill="#000" fill-opacity="0.5" rx="10"/>
+          <text x="10" y="30" class="title">${text.split('\n')[0]}</text>
+          <text x="10" y="55" class="title">${text.split('\n')[1]}</text>
+        </svg>
+        `;
+        const svgBuffer = Buffer.from(svgImage);
+
+        // 3. Gabungkan gambar asli dengan watermark
+        const imageBuffer = await sharp(filePath)
+            .composite([{
+                input: svgBuffer,
+                gravity: 'southwest', // Posisi di pojok kiri bawah
+            }])
+            .toBuffer();
+        
+        // 4. Timpa file asli dengan yang sudah di-watermark
+        await sharp(imageBuffer).toFile(filePath);
+
+    } catch (error) {
+        console.error("Gagal menambahkan watermark:", error.message);
+    }
+};
+
 // Endpoint 1: Absen MASUK (Logika checklist diubah)
 router.post('/masuk', verifyToken, upload.single('foto_absen'), async (req, res) => {
     try {
@@ -26,6 +64,7 @@ router.post('/masuk', verifyToken, upload.single('foto_absen'), async (req, res)
         const userId = req.user.id;
         
         if (!req.file) return res.status(400).json({ message: 'Foto absensi diperlukan.' });
+        await addWatermark(req.file.path, latitude, longitude);
         const foto_path = path.join('uploads', 'absensi', req.file.filename).replace(/\\/g, '/');
 
         const [activeSession] = await db.query('SELECT * FROM absensi WHERE user_id = ? AND waktu_keluar IS NULL', [userId]);
@@ -95,6 +134,7 @@ router.post('/keluar', verifyToken, upload.single('foto_absen'), async (req, res
         const userId = req.user.id;
 
         if (!req.file) return res.status(400).json({ message: 'Foto absensi keluar diperlukan.' });
+          await addWatermark(req.file.path, latitude, longitude);
         const foto_path_keluar = path.join('uploads', 'absensi', req.file.filename).replace(/\\/g, '/');
 
         const [rows] = await db.query('SELECT * FROM absensi WHERE id = ? AND user_id = ?', [absensiId, userId]);
