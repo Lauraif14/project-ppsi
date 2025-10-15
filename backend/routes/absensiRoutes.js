@@ -3,6 +3,8 @@ const multer = require('multer');
 const path = require('path');
 const db = require('../db');
 const { verifyToken } = require('../middleware/auth');
+const axios = require('axios'); 
+const sharp = require('sharp');
 
 const router = express.Router();
 
@@ -169,16 +171,36 @@ router.post('/keluar', verifyToken, upload.single('foto_absen'), async (req, res
     }
 });
 
-// Endpoint 4: Get Status Absensi Terkini (tidak ada perubahan)
+// === ENDPOINT 4: Get Status Absensi Terkini  ===
 router.get('/status', verifyToken, async (req, res) => {
-    // ... (kode di sini sudah benar dan tidak perlu diubah) ...
     try {
-        const [activeSession] = await db.query(
+        const [activeSessions] = await db.query(
             'SELECT * FROM absensi WHERE user_id = ? AND waktu_keluar IS NULL ORDER BY waktu_masuk DESC LIMIT 1',
             [req.user.id]
         );
-        res.json(activeSession[0] || null);
+
+        if (activeSessions.length === 0) {
+            return res.json(null); // Tidak ada sesi aktif
+        }
+
+        const sesiAbsen = activeSessions[0];
+        const waktuMasuk = new Date(sesiAbsen.waktu_masuk);
+        const hariMasuk = waktuMasuk.toDateString(); // Contoh: "Wed Oct 15 2025"
+        
+        const hariIni = new Date().toDateString();
+
+        if (hariMasuk !== hariIni) {
+            // Jika hari sudah berbeda, anggap sesi sudah berakhir (pengurus lupa absen keluar)
+            // Mengembalikan null akan membuat front-end menampilkan tombol "Ambil Absen Masuk"
+            return res.json(null);
+        }
+        // ----------------------------------------------------
+
+        // Jika hari masih sama, kirim data sesi aktif
+        res.json(sesiAbsen);
+
     } catch (error) {
+        console.error("Error saat get status:", error);
         res.status(500).json({ message: 'Gagal mengambil status absensi.' });
     }
 });

@@ -8,6 +8,7 @@ const profileRoutes = require('./routes/profileRoutes');
 const absensiRoutes = require('./routes/absensiRoutes');
 const userRoutes = require('./routes/userRoutes');
 const jadwalRoutes = require('./routes/jadwalRoutes');
+const informasiRoutes = require('./routes/informasiRoutes')
 
 const app = express();
 app.use(cors()); // Izinkan request dari domain lain (React app Anda)
@@ -19,6 +20,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/absensi', absensiRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/jadwal', jadwalRoutes);
+app.use('/api/informasi', informasiRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server berjalan di port ${PORT}`));
