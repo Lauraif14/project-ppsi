@@ -2,11 +2,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from '../api/axios';
 import { CheckCircle, Clock, RefreshCw, LogOut, Camera, AlertTriangle } from 'lucide-react';
-
-// Impor komponen-komponen lain
 import AbsensiKamera from './AbsensiKamera';
 import JadwalPiket from './JadwalPiket';
 import ProfilSingkat from './ProfilSingkat';
+import { isObject } from "framer-motion";
 
 // Komponen Checklist Inventaris
 const InventarisChecklist = ({ sesiAbsen, setSesiAbsen, onChecklistSubmit }) => {
@@ -111,7 +110,7 @@ const InventarisChecklist = ({ sesiAbsen, setSesiAbsen, onChecklistSubmit }) => 
 
 // Komponen Dashboard Utama
 const DashboardUser = () => {
-    const [userInfo, setUserInfo] = useState({ name: '', role: '' });
+    const [userInfo, setUserInfo] = useState({ name: '', role: '', avatar_url: ''});
     const [sesiAbsen, setSesiAbsen] = useState(null);
     const [showAbsenModal, setShowAbsenModal] = useState(false);
     const [modeAbsen, setModeAbsen] = useState('masuk');
@@ -131,7 +130,12 @@ const DashboardUser = () => {
                 api.get('/profile', { headers }),
                 api.get('/absensi/status', { headers })
             ]);
-            setUserInfo({ name: profileRes.data.nama_lengkap, role: profileRes.data.jabatan });
+            setUserInfo({ 
+                name: profileRes.data.nama_lengkap, 
+                role: profileRes.data.jabatan,
+                division:profileRes.data.divisi,
+                avatar_url: profileRes.data.avatar_url 
+            });
             setSesiAbsen(statusRes.data);
         } catch (error) {
             console.error('Error loading data:', error);
