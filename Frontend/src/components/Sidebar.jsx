@@ -9,7 +9,7 @@ const menuItems = [
   { id: "master", label: "Data Master", icon: <ClipboardList size={20} />, path: "/master" },
   { id: "jadwal", label: "Jadwal Piket", icon: <Calendar size={20} />, path: "/jadwal-piket" },
   { id: "laporan", label: "Laporan", icon: <BarChart3 size={20} />, path: "/laporan" },
-  { id: "users", label: "User Management", icon: <Users size={20} />, path: "/users" },
+  // { id: "users", label: "User Management", icon: <Users size={20} />, path: "/users" },
 ];
 
 const Sidebar = () => {

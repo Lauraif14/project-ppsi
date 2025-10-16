@@ -1,60 +1,78 @@
-// profileRoutes.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
 const db = require('../db');
-const verifyToken = require('../middleware/auth'); // Kita akan buat middleware ini
+const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// GET - Mengambil data profil pengguna saat ini
+// Konfigurasi Multer untuk upload foto profil (avatar)
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const uploadPath = path.join(__dirname, '..', 'public', 'uploads', 'avatars');
+        cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = `user-${req.user.id}-${Date.now()}${path.extname(file.originalname)}`;
+        cb(null, uniqueSuffix);
+    }
+});
+const upload = multer({ storage: storage });
+
+// GET - Mengambil data profil (DIUBAH untuk menyertakan avatar_url)
 router.get('/', verifyToken, async (req, res) => {
     try {
         const [rows] = await db.query(
-           'SELECT id, username, email, nama_lengkap, divisi, jabatan, role FROM users WHERE id = ?',
-            [req.user.id] // req.user.id didapat dari middleware verifyToken
+            'SELECT id, username, email, nama_lengkap, divisi, jabatan, role, avatar_url FROM users WHERE id = ?',
+            [req.user.id]
         );
-
         if (rows.length === 0) {
             return res.status(404).json({ message: 'User tidak ditemukan' });
         }
-        res.json(rows[0]);
+        
+        const user = rows[0];
+        // Buat URL lengkap untuk foto profil jika ada
+        if (user.avatar_url) {
+            user.avatar_url = `${req.protocol}://${req.get('host')}/${user.avatar_url.replace(/\\/g, '/')}`;
+        }
+        res.json(user);
     } catch (error) {
         res.status(500).json({ message: 'Kesalahan server' });
     }
 });
 
-// PUT - Memperbarui data profil pengguna saat ini
-router.put('/', verifyToken, async (req, res) => {
+// PUT - Memperbarui profil (DIUBAH untuk menangani file)
+router.put('/', verifyToken, upload.single('avatar'), async (req, res) => {
     try {
-        const { username, name, email, divisi, jabatan, password, confirmPassword } = req.body;
+        const { name, email, username, password, confirmPassword } = req.body;
         const userId = req.user.id;
 
-        // Validasi dasar
-        if (!name || !email) {
-            return res.status(400).json({ message: 'Nama dan email harus diisi.' });
-        }
-
-        // Update nama dan email
+        // Update info teks
         await db.query(
-            'UPDATE users SET username = ?, nama_lengkap = ?, email = ?, divisi = ?, jabatan = ? WHERE id = ?',
-            [name, email, divisi, jabatan, userId]
+            'UPDATE users SET nama_lengkap = ?, email = ?, username = ? WHERE id = ?',
+            [name, email, username, userId]
         );
 
-        // Jika pengguna ingin mengubah password
+        // Update foto profil jika ada file baru yang di-upload
+        if (req.file) {
+            const avatar_url = path.join('uploads', 'avatars', req.file.filename).replace(/\\/g, '/');
+            await db.query('UPDATE users SET avatar_url = ? WHERE id = ?', [avatar_url, userId]);
+        }
+        
+        // Update password jika diisi
         if (password) {
             if (password !== confirmPassword) {
                 return res.status(400).json({ message: 'Password konfirmasi tidak cocok.' });
             }
             const hashedPassword = await bcrypt.hash(password, 10);
-            await db.query(
-                'UPDATE users SET password = ? WHERE id = ?',
-                [hashedPassword, userId]
-            );
+            await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, userId]);
         }
 
         res.json({ message: 'Profil berhasil diperbarui.' });
     } catch (error) {
-        res.status(500).json({ message: 'Kesalahan server' });
+        console.error("Update profile error:", error);
+        res.status(500).json({ message: 'Gagal memperbarui profil.' });
     }
 });
 
