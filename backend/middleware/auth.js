@@ -1,31 +1,52 @@
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 
+/* 
+----------------------------------------
+🔹 1. Middleware untuk verifikasi JWT (semua user)
+----------------------------------------
+*/
 const verifyToken = (req, res, next) => {
-    const token = req.headers['authorization']?.split(' ')[1];
+  try {
+    // Ambil token dari header Authorization: Bearer <token>
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+
     if (!token) {
-        return res.status(403).send('Token diperlukan untuk otentikasi');
+      return res
+        .status(401)
+        .json({ success: false, message: "Token diperlukan untuk otentikasi." });
     }
 
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        next(); // Panggil next() jika token valid
-    } catch (err) {
-        return res.status(401).send('Token tidak valid');
-    }
+    // Verifikasi token menggunakan secret key
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Simpan data user hasil decode (biasanya { id, role, username })
+    req.user = decoded;
+
+    next(); // lanjut ke route berikutnya
+  } catch (err) {
+    console.error("❌ Error verifyToken:", err.message);
+    return res
+      .status(401)
+      .json({ success: false, message: "Token tidak valid atau kedaluwarsa." });
+  }
 };
 
+/* 
+----------------------------------------
+🔹 2. Middleware tambahan untuk role ADMIN
+----------------------------------------
+*/
 const verifyAdmin = (req, res, next) => {
-    // Gunakan kembali verifyToken untuk memastikan user sudah login
-    verifyToken(req, res, () => {
-        // Cek role setelah token diverifikasi
-        if (req.user && req.user.role === 'admin') {
-            next(); // Lanjutkan jika rolenya admin
-        } else {
-            res.status(403).json({ message: 'Akses ditolak. Hanya untuk admin.' });
-        }
-    });
+  // Pastikan token diverifikasi dulu
+  verifyToken(req, res, () => {
+    if (req.user?.role === "admin") {
+      return next(); // izinkan lanjut
+    }
+    return res
+      .status(403)
+      .json({ success: false, message: "Akses ditolak. Hanya untuk admin." });
+  });
 };
 
-// DIUBAH: Ekspor kedua fungsi di dalam sebuah objek
 module.exports = { verifyToken, verifyAdmin };

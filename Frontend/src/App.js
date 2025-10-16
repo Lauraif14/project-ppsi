@@ -3,7 +3,7 @@ import React from "react";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 
-// Komponen Halaman
+// Pages
 import LandingPage from "./components/LandingPage";
 import LoginPage from "./components/LoginPage";
 import DashboardAdmin from "./admin/DashboardAdmin";
@@ -13,7 +13,12 @@ import JadwalPiketPage from "./admin/JadwalPiketPage";
 import LaporanPage from "./admin/LaporanPage";
 import UserManagement from "./admin/UserManagementPage";
 import SettingsProfile from "./admin/SettingsProfile";
-// Komponen Penjaga
+import InformasiAdmin from "./admin/InformasiAdmin";
+
+import RiwayatPiket from "./user/RiwayatPiketUser";
+import SopPanduan from "./user/SOPPanduan";
+
+// Protected Route
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function AnimatedRoutes() {
@@ -22,16 +27,18 @@ function AnimatedRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        {/* Rute Publik */}
+        {/* --- PUBLIC ROUTES --- */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
 
-        {/* --- Rute Terproteksi untuk User Biasa & Admin --- */}
+        {/* --- USER ROUTES --- */}
         <Route element={<ProtectedRoute allowedRoles={['user', 'admin']} />}>
           <Route path="/user-dashboard" element={<DashboardUser />} />
+          <Route path="/user/riwayat" element={<RiwayatPiket />} />
+          <Route path="/user/sop-panduan" element={<SopPanduan />} />
         </Route>
-        
-        {/* --- Rute Terproteksi HANYA untuk Admin --- */}
+
+        {/* --- ADMIN ROUTES --- */}
         <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
           <Route path="/admin-dashboard" element={<DashboardAdmin />} />
           <Route path="/master" element={<MasterPage />} />
@@ -39,6 +46,8 @@ function AnimatedRoutes() {
           <Route path="/laporan" element={<LaporanPage />} />
           <Route path="/users" element={<UserManagement />} />
           <Route path="/profile" element={<SettingsProfile />} />
+          <Route path="/admin/informasi" element={<InformasiAdmin />} />
+          
         </Route>
       </Routes>
     </AnimatePresence>

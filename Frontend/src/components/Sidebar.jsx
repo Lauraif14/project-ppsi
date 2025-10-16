@@ -2,13 +2,22 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { NavLink } from "react-router-dom";
-import { Home, ClipboardList, Calendar, BarChart3, Menu, Users } from "lucide-react";
+import {
+  Home,
+  ClipboardList,
+  Calendar,
+  BarChart3,
+  Menu,
+  Users,
+  FileText,
+} from "lucide-react";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: <Home size={20} />, path: "/admin-dashboard" },
   { id: "master", label: "Data Master", icon: <ClipboardList size={20} />, path: "/master" },
   { id: "jadwal", label: "Jadwal Piket", icon: <Calendar size={20} />, path: "/jadwal-piket" },
   { id: "laporan", label: "Laporan", icon: <BarChart3 size={20} />, path: "/laporan" },
+  { id: "informasi", label: "SOP & Panduan", icon: <FileText size={20} />, path: "/admin/informasi" }, // ✅ Tambahan baru
   // { id: "users", label: "User Management", icon: <Users size={20} />, path: "/users" },
 ];
 
@@ -51,11 +60,9 @@ const Sidebar = () => {
                   : "text-gray-700 hover:bg-gray-50 border-transparent hover:border-gray-200"
               }`
             }
-            title={collapsed ? item.label : ""} // tooltip saat collapsed
+            title={collapsed ? item.label : ""}
           >
-            <div className="flex-shrink-0">
-              {item.icon}
-            </div>
+            <div className="flex-shrink-0">{item.icon}</div>
             {!collapsed && <span>{item.label}</span>}
           </NavLink>
         ))}
