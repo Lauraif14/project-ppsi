@@ -7,6 +7,7 @@ const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const absensiRoutes = require('./routes/absensiRoutes');
 const userRoutes = require('./routes/userRoutes');
+const piketRoutes = require('./routes/piketRoutes');
 const jadwalRoutes = require('./routes/jadwalRoutes');
 const informasiRoutes = require('./routes/informasiRoutes')
 
@@ -19,6 +20,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/absensi', absensiRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/piket', piketRoutes);
 app.use('/api/jadwal', jadwalRoutes);
 app.use('/api/informasi', informasiRoutes);
 
