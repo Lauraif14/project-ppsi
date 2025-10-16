@@ -24,7 +24,9 @@ const LaporanPage = () => {
     try {
       const token = localStorage.getItem('token');
       
-      const response = await fetch(`http://localhost:5000/api/piket/absensi?date=${date}`, {
+      console.log('🔍 Fetching absensi data for date:', date);
+      
+      const response = await fetch(`http://localhost:5000/api/absensi/laporan?date=${date}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -32,13 +34,56 @@ const LaporanPage = () => {
         }
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const result = await response.json();
+      console.log('📊 Absensi API Response:', result);
       
       if (result.success) {
-        setAbsensiData(result.data || []);
-        return result.data || [];
+        // Transform data sesuai struktur database yang benar
+        const transformedData = result.data.map(item => ({
+          id: item.id,
+          user_id: item.user_id,
+          nama_lengkap: item.nama_lengkap || 'N/A',
+          username: item.username || 'N/A',
+          email: item.email || 'N/A',
+          jabatan: item.jabatan || 'N/A',
+          divisi: item.divisi || 'N/A',
+          
+          // Waktu absen
+          waktu_masuk: item.waktu_masuk,
+          waktu_keluar: item.waktu_keluar,
+          waktu_absen: item.waktu_absen_formatted || '-',
+          waktu_keluar_formatted: item.waktu_keluar_formatted || '-',
+          
+          // Status
+          status: item.status || 'Tidak Hadir',
+          
+          // Lokasi (koordinat)
+          latitude: item.latitude,
+          longitude: item.longitude,
+          latitude_keluar: item.latitude_keluar,
+          longitude_keluar: item.longitude_keluar,
+          
+          // Foto
+          foto_path: item.foto_path,
+          foto_path_keluar: item.foto_path_keluar,
+          
+          // Inventaris checklist
+          inventaris_checklist: item.inventaris_checklist,
+          checklist_submitted: item.checklist_submitted,
+          
+          // Alias untuk kompatibilitas
+          name: item.nama_lengkap,
+          time: item.waktu_absen_formatted || item.waktu_masuk
+        }));
+
+        setAbsensiData(transformedData);
+        return transformedData;
       } else {
-        console.warn('No absensi data found for date:', date);
+        console.warn('No absensi data found for date:', date, result.message);
         setAbsensiData([]);
         return [];
       }
@@ -181,11 +226,13 @@ const LaporanPage = () => {
     fetchData();
   }, [dataType, selectedDate]);
 
-  // Statistik berdasarkan data real
+  // Statistik berdasarkan data real dari database
   const absensiStats = {
     hadir: data.filter(item => item.status === "Hadir").length,
+    belumKeluar: data.filter(item => item.status === "Belum Keluar").length,
     tidak: data.filter(item => item.status === "Tidak Hadir").length,
-    izin: data.filter(item => item.status === "Izin").length,
+    withPhoto: data.filter(item => item.foto_path).length,
+    withChecklist: data.filter(item => item.checklist_submitted === 1).length,
     total: data.length
   };
 
@@ -199,11 +246,14 @@ const LaporanPage = () => {
     total: data.length
   };
 
+  // Update badge status absensi sesuai logika database
   const getStatusBadge = (status) => {
     const statusConfig = {
       "Hadir": "bg-green-200 text-green-900",
+      "Belum Keluar": "bg-yellow-200 text-yellow-900",
       "Tidak Hadir": "bg-red-200 text-red-900",
-      "Izin": "bg-yellow-200 text-yellow-900",
+      "Izin": "bg-blue-200 text-blue-900",
+      "Sakit": "bg-purple-200 text-purple-900",
       "Terlambat": "bg-orange-200 text-orange-900"
     };
     return statusConfig[status] || "bg-gray-200 text-gray-900";
@@ -490,17 +540,62 @@ const LaporanPage = () => {
                           <>
                             <td className="px-6 py-4 whitespace-nowrap flex items-center">
                               <div className="w-8 h-8 bg-blue-200 text-blue-900 rounded-full flex items-center justify-center font-semibold mr-3">
-                                {(item.nama_lengkap || item.name || 'N').charAt(0)}
+                                {(item.nama_lengkap || 'N').charAt(0).toUpperCase()}
                               </div>
-                              {item.nama_lengkap || item.name || 'N/A'}
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {item.nama_lengkap || 'N/A'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {item.jabatan} • {item.divisi}
+                                </div>
+                              </div>
                             </td>
+                            
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                              {item.waktu_absen || item.time || '-'}
+                              <div>
+                                {item.waktu_absen && item.waktu_absen !== '-' ? (
+                                  <div>
+                                    <div className="font-medium">
+                                      📍 Masuk: {item.waktu_absen}
+                                    </div>
+                                    {item.waktu_keluar_formatted && item.waktu_keluar_formatted !== '-' && (
+                                      <div className="text-xs text-gray-500">
+                                        🚪 Keluar: {item.waktu_keluar_formatted}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </div>
                             </td>
+                            
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(item.status)}`}>
-                                {item.status}
-                              </span>
+                              <div className="space-y-1">
+                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(item.status)}`}>
+                                  {item.status}
+                                </span>
+                                
+                                {/* Indikator foto dan checklist */}
+                                <div className="flex gap-2">
+                                  {item.foto_path && (
+                                    <span className="text-xs text-green-600 bg-green-100 px-1 py-0.5 rounded">
+                                      📸 Foto Masuk
+                                    </span>
+                                  )}
+                                  {item.foto_path_keluar && (
+                                    <span className="text-xs text-blue-600 bg-blue-100 px-1 py-0.5 rounded">
+                                      📸 Foto Keluar
+                                    </span>
+                                  )}
+                                  {item.checklist_submitted === 1 && (
+                                    <span className="text-xs text-purple-600 bg-purple-100 px-1 py-0.5 rounded">
+                                      ✅ Checklist
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                           </>
                         ) : (

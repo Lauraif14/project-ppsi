@@ -197,4 +197,119 @@ router.get('/history', verifyToken, async (req, res) => {
     }
 });
 
+// GET absensi berdasarkan tanggal - DIPERBAIKI sesuai struktur database
+router.get('/laporan', verifyToken, async (req, res) => {
+  try {
+    const { date } = req.query;
+    
+    console.log('🔍 Getting absensi data for date:', date);
+    
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter tanggal diperlukan'
+      });
+    }
+    
+    // Query untuk mengambil data absensi berdasarkan tanggal
+    // Sesuaikan dengan struktur tabel yang benar
+    const [rows] = await db.execute(`
+      SELECT 
+        a.id,
+        a.user_id,
+        a.waktu_masuk,
+        a.waktu_keluar,
+        a.foto_path,
+        a.foto_path_keluar,
+        a.latitude,
+        a.longitude,
+        a.latitude_keluar,
+        a.longitude_keluar,
+        a.inventaris_checklist,
+        a.checklist_submitted,
+        u.nama_lengkap,
+        u.username,
+        u.email,
+        u.jabatan,
+        u.divisi,
+        -- Tentukan status berdasarkan waktu_masuk dan waktu_keluar
+        CASE 
+          WHEN a.waktu_masuk IS NOT NULL AND a.waktu_keluar IS NOT NULL THEN 'Hadir'
+          WHEN a.waktu_masuk IS NOT NULL AND a.waktu_keluar IS NULL THEN 'Belum Keluar'
+          ELSE 'Tidak Hadir'
+        END as status,
+        -- Format waktu untuk tampilan
+        TIME_FORMAT(a.waktu_masuk, '%H:%i') as waktu_absen_formatted,
+        TIME_FORMAT(a.waktu_keluar, '%H:%i') as waktu_keluar_formatted
+      FROM absensi a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE DATE(a.waktu_masuk) = ? OR DATE(a.waktu_keluar) = ?
+      ORDER BY a.waktu_masuk ASC
+    `, [date, date]);
+    
+    console.log('📊 Found absensi records:', rows.length);
+    
+    res.json({
+      success: true,
+      data: rows,
+      total: rows.length,
+      date: date
+    });
+  } catch (error) {
+    console.error('Error fetching absensi data:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching absensi data',
+      error: error.message
+    });
+  }
+});
+
+// GET absensi hari ini untuk pengurus yang belum absen
+router.get('/today', verifyToken, async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    
+    console.log('🔍 Getting today absensi data:', today);
+    
+    // Get semua pengurus dan status absensi hari ini
+    const [rows] = await db.execute(`
+      SELECT 
+        u.id,
+        u.nama_lengkap,
+        u.username,
+        u.email,
+        u.jabatan,
+        u.divisi,
+        a.waktu_masuk,
+        a.waktu_keluar,
+        a.foto_path,
+        CASE 
+          WHEN a.waktu_masuk IS NOT NULL AND a.waktu_keluar IS NOT NULL THEN 'Hadir'
+          WHEN a.waktu_masuk IS NOT NULL AND a.waktu_keluar IS NULL THEN 'Belum Keluar'
+          ELSE 'Tidak Hadir'
+        END as status,
+        TIME_FORMAT(a.waktu_masuk, '%H:%i') as waktu_absen
+      FROM users u
+      LEFT JOIN absensi a ON u.id = a.user_id AND DATE(a.waktu_masuk) = ?
+      WHERE u.role = 'user'
+      ORDER BY u.nama_lengkap
+    `, [today]);
+    
+    res.json({
+      success: true,
+      data: rows,
+      total: rows.length,
+      date: today
+    });
+  } catch (error) {
+    console.error('Error fetching today absensi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching today absensi',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
