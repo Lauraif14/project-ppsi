@@ -5,7 +5,7 @@ import { CheckCircle, Clock, RefreshCw, LogOut, Camera, AlertTriangle } from 'lu
 import AbsensiKamera from './AbsensiKamera';
 import JadwalPiket from './JadwalPiket';
 import ProfilSingkat from './ProfilSingkat';
-import { isObject } from "framer-motion";
+import InformasiBanner from '../components/InformasiBanner';
 
 // Komponen Checklist Inventaris
 const InventarisChecklist = ({ sesiAbsen, setSesiAbsen, onChecklistSubmit }) => {
@@ -133,7 +133,7 @@ const DashboardUser = () => {
             setUserInfo({ 
                 name: profileRes.data.nama_lengkap, 
                 role: profileRes.data.jabatan,
-                division:profileRes.data.divisi,
+                division: profileRes.data.divisi,
                 avatar_url: profileRes.data.avatar_url 
             });
             setSesiAbsen(statusRes.data);
@@ -187,8 +187,8 @@ const DashboardUser = () => {
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto p-6 lg:p-8">
-                {/* Header dengan Logout */}
-                <div className="flex justify-between items-center mb-8">
+                {/* Header dengan Logout */} 
+                <div className="flex justify-between items-center mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-800">Dashboard Piket</h1>
                         <p className="text-gray-600 mt-1">Selamat datang, {userInfo.name}</p>
@@ -207,8 +207,11 @@ const DashboardUser = () => {
                         {pesanDashboard}
                     </div>
                 )}
-                
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+                {/* Informasi Banner (SOP & Panduan) */}
+                <InformasiBanner />
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-4">
                     {/* === KOLOM UTAMA === */}
                     <div className="lg:col-span-8 space-y-8">
                         {!sesiAbsen ? (
@@ -282,11 +285,7 @@ const DashboardUser = () => {
                                 <h3 className="font-bold text-xl mb-5 text-gray-800">Persyaratan Absen Keluar</h3>
                                 
                                 <div className="space-y-3 mb-6">
-                                    <div className={`p-4 rounded-lg border-2 ${
-                                        sesiAbsen.checklist_submitted 
-                                            ? 'bg-green-50 border-green-400' 
-                                            : 'bg-yellow-50 border-yellow-400'
-                                    }`}>
+                                    <div className={`p-4 rounded-lg border-2 ${sesiAbsen.checklist_submitted ? 'bg-green-50 border-green-400' : 'bg-yellow-50 border-yellow-400'}`}>
                                         <div className="flex items-center gap-3">
                                             {sesiAbsen.checklist_submitted ? (
                                                 <CheckCircle className="text-green-600 flex-shrink-0" size={24}/>
@@ -295,20 +294,14 @@ const DashboardUser = () => {
                                             )}
                                             <div>
                                                 <span className="font-semibold text-gray-800 block">Laporan Inventaris</span>
-                                                <span className={`text-sm ${
-                                                    sesiAbsen.checklist_submitted ? 'text-green-700' : 'text-yellow-700'
-                                                }`}>
+                                                <span className={`text-sm ${sesiAbsen.checklist_submitted ? 'text-green-700' : 'text-yellow-700'}`}>
                                                     {sesiAbsen.checklist_submitted ? 'Selesai' : 'Belum selesai'}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                     
-                                    <div className={`p-4 rounded-lg border-2 ${
-                                        isDurasiCukup 
-                                            ? 'bg-green-50 border-green-400' 
-                                            : 'bg-yellow-50 border-yellow-400'
-                                    }`}>
+                                    <div className={`p-4 rounded-lg border-2 ${isDurasiCukup ? 'bg-green-50 border-green-400' : 'bg-yellow-50 border-yellow-400'}`}>
                                         <div className="flex items-center gap-3">
                                             {isDurasiCukup ? (
                                                 <CheckCircle className="text-green-600 flex-shrink-0" size={24}/>
@@ -317,9 +310,7 @@ const DashboardUser = () => {
                                             )}
                                             <div>
                                                 <span className="font-semibold text-gray-800 block">Durasi Piket</span>
-                                                <span className={`text-sm ${
-                                                    isDurasiCukup ? 'text-green-700' : 'text-yellow-700'
-                                                }`}>
+                                                <span className={`text-sm ${isDurasiCukup ? 'text-green-700' : 'text-yellow-700'}`}>
                                                     {isDurasiCukup ? 'Minimal 2 jam terpenuhi' : `${sisaMenit} menit lagi`}
                                                 </span>
                                             </div>
