@@ -1,53 +1,42 @@
 // backend/routes/informasiRoutes.js
 const express = require('express');
-const db = require('../db');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { verifyToken, verifyAdmin } = require('../middleware/auth');
+const { informasiController } = require('../controllers/informasiController');
+ // <<--- penting
+
 const router = express.Router();
 
-// Endpoint untuk PENGURUS (user) - Hanya mengambil data
-router.get('/', verifyToken, async (req, res) => {
-    try {
-        const [informasi] = await db.query('SELECT * FROM informasi ORDER BY kategori, judul');
-        res.json(informasi);
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal mengambil informasi.' });
-    }
-});
+// ensure directory exists (safe)
+const uploadDir = path.join(__dirname, '..', 'public', 'uploads', 'informasi');
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn('Warn ensure upload dir:', e && e.message ? e.message : e);
+}
 
-// === Rute Khusus Admin ===
+// use memory storage in test to avoid disk writes
+const storage = process.env.NODE_ENV === 'test'
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (req, file, cb) => cb(null, uploadDir),
+      filename: (req, file, cb) => {
+        const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const safeName = file.originalname.replace(/\s+/g, '_');
+        cb(null, `${unique}-${safeName}`);
+      }
+    });
 
-// Endpoint untuk ADMIN - Membuat informasi baru
-router.post('/', verifyAdmin, async (req, res) => {
-    try {
-        const { judul, isi, kategori } = req.body;
-        await db.query('INSERT INTO informasi (judul, isi, kategori) VALUES (?, ?, ?)', [judul, isi, kategori]);
-        res.status(201).json({ message: 'Informasi berhasil dibuat.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal membuat informasi.' });
-    }
-});
+const upload = multer({ storage });
 
-// Endpoint untuk ADMIN - Memperbarui informasi
-router.put('/:id', verifyAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { judul, isi, kategori } = req.body;
-        await db.query('UPDATE informasi SET judul = ?, isi = ?, kategori = ? WHERE id = ?', [judul, isi, kategori, id]);
-        res.json({ message: 'Informasi berhasil diperbarui.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal memperbarui informasi.' });
-    }
-});
-
-// Endpoint untuk ADMIN - Menghapus informasi
-router.delete('/:id', verifyAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        await db.query('DELETE FROM informasi WHERE id = ?', [id]);
-        res.json({ message: 'Informasi berhasil dihapus.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal menghapus informasi.' });
-    }
-});
+// Routes
+router.get('/', verifyToken, informasiController.getAllInformasi);
+router.post('/', verifyAdmin, upload.single('file'), informasiController.createInformasi);
+router.put('/:id', verifyAdmin, upload.single('file'), informasiController.updateInformasi);
+router.delete('/:id', verifyAdmin, informasiController.deleteInformasi);
 
 module.exports = router;
