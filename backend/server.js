@@ -8,7 +8,11 @@ const profileRoutes = require('./routes/profileRoutes');
 const absensiRoutes = require('./routes/absensiRoutes');
 const userRoutes = require('./routes/userRoutes');
 const jadwalRoutes = require('./routes/jadwalRoutes');
+<<<<<<< Updated upstream
 
+=======
+const informasiRoutes = require('./routes/informasiRoutes')
+>>>>>>> Stashed changes
 const app = express();
 app.use(cors()); // Izinkan request dari domain lain (React app Anda)
 app.use(express.json()); // Agar bisa membaca body request dalam format JSON
