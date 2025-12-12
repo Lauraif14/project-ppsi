@@ -1,3 +1,5 @@
+// routes/adminRoutes.js (FINAL GABUNGAN)
+
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
@@ -160,119 +162,39 @@ router.post('/pengurus/bulk', verifyToken, upload.single('file'), async (req, re
     filePath = req.file.path;
     console.log('File uploaded to:', filePath);
 
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(400).json({
-        success: false,
-        message: 'File tidak ditemukan setelah upload'
-      });
-    }
+// Import Controllers
+const userController = require('../controllers/userController'); // User Controller (OOP Class)
+const inventarisController = require('../controllers/inventarisController'); // Inventaris Controller (Exports)
 
-    let jsonData = [];
-    const fileExt = path.extname(req.file.originalname).toLowerCase();
-    
-    if (fileExt === '.csv') {
-      // Improved CSV parsing
-      try {
-        const csvData = fs.readFileSync(filePath, 'utf-8');
-        const lines = csvData.split('\n').filter(line => line.trim() !== '');
-        
-        if (lines.length < 2) {
-          return res.status(400).json({
-            success: false,
-            message: 'File CSV harus memiliki header dan minimal 1 baris data'
-          });
-        }
+// Import Multer
+const { upload } = require('../utils/uploadUtils'); 
 
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        console.log('CSV Headers:', headers);
-        
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-          const row = {};
-          
-          headers.forEach((header, index) => {
-            row[header] = values[index] || '';
-          });
-          
-          // Skip empty rows
-          if (row.nama_lengkap || row.username || row.email) {
-            jsonData.push(row);
-          }
-        }
-      } catch (csvError) {
-        console.error('CSV parsing error:', csvError);
-        return res.status(400).json({
-          success: false,
-          message: 'Error parsing CSV file: ' + csvError.message
-        });
-      }
-    } else {
-      // Handle Excel files
-      try {
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        jsonData = xlsx.utils.sheet_to_json(worksheet);
-      } catch (xlsxError) {
-        console.error('XLSX parsing error:', xlsxError);
-        return res.status(400).json({
-          success: false,
-          message: 'Error parsing Excel file: ' + xlsxError.message
-        });
-      }
-    }
+// Helper untuk binding User Controller (karena ini Class/OOP)
+const bindUser = (method) => method.bind(userController);
+const bindInventaris = (method) => method.bind(inventarisController); 
 
-    console.log('Parsed data:', jsonData);
+// --- A. PENGURUS/USER MANAGEMENT ---
 
-    if (jsonData.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'File kosong atau format tidak sesuai. Pastikan file memiliki kolom nama_lengkap, username, email, divisi, jabatan'
-      });
-    }
+// GET all users (list user role="user")
+router.get('/', verifyToken, bindUser(userController.getAllUsers)); 
 
-    const results = [];
-    const errors = [];
-    const defaultPassword = '123456'; // Password default
+// GET all users (list user lengkap untuk manajemen)
+router.get('/all', verifyToken, bindUser(userController.getAllUsersComplete));
 
-    // Process each row
-    for (let i = 0; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      try {
-        // Clean and validate data
-        const namaLengkap = row.nama_lengkap ? row.nama_lengkap.toString().trim() : '';
-        const username = row.username ? row.username.toString().trim() : '';
-        const email = row.email ? row.email.toString().trim() : '';
-        const divisi = row.divisi ? row.divisi.toString().trim() : '';
-        const jabatan = row.jabatan ? row.jabatan.toString().trim() : '';
+// POST create new user (simple form)
+router.post('/', verifyToken, bindUser(userController.createUser));
 
-        // Validasi required fields
-        if (!namaLengkap || !username || !email || !divisi || !jabatan) {
-          errors.push(`Baris ${i + 2}: Semua field harus diisi (nama_lengkap, username, email, divisi, jabatan)`);
-          continue;
-        }
+// POST create new user/account (form lengkap)
+router.post('/create-account', verifyToken, bindUser(userController.createAccount));
 
-        // Validasi format email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          errors.push(`Baris ${i + 2}: Format email tidak valid (${email})`);
-          continue;
-        }
+// PUT update user
+router.put('/:id', verifyToken, bindUser(userController.updateUser));
 
-        // Check if username already exists
-        const [existingUsername] = await db.execute('SELECT id FROM users WHERE username = ?', [username]);
-        if (existingUsername.length > 0) {
-          errors.push(`Baris ${i + 2}: Username ${username} sudah digunakan`);
-          continue;
-        }
+// DELETE user
+router.delete('/:id', verifyToken, bindUser(userController.deleteUser));
 
-        // Check if email already exists
-        const [existingEmail] = await db.execute('SELECT id FROM users WHERE email = ?', [email]);
-        if (existingEmail.length > 0) {
-          errors.push(`Baris ${i + 2}: Email ${email} sudah digunakan`);
-          continue;
-        }
+// POST reset password
+router.post('/:id/reset-password', verifyToken, bindUser(userController.resetPassword));
 
         // Hash password default
         const hashedPassword = await bcrypt.hash(defaultPassword, 10);
@@ -427,11 +349,7 @@ router.post('/inventaris/bulk', verifyToken, upload.single('file'), async (req, 
         const jumlah = row.jumlah ? parseInt(row.jumlah) : 0;
         const status = row.status && row.status.toString().trim() ? row.status.toString().trim() : 'Tersedia';
 
-        // Validasi required fields
-        if (!namaBarang || !jumlah || jumlah <= 0) {
-          errors.push(`Baris ${i + 2}: nama_barang dan jumlah (harus > 0) harus diisi`);
-          continue;
-        }
+// --- B. INVENTARIS MANAGEMENT (DI BAWAH PATH ADMIN/USERS) ---
 
         // Validasi status
         if (status && !validStatuses.includes(status)) {
@@ -474,43 +392,13 @@ router.post('/inventaris/bulk', verifyToken, upload.single('file'), async (req, 
           });
         }
 
-      } catch (error) {
-        console.error('Row processing error:', error);
-        errors.push(`Baris ${i + 2}: ${error.message}`);
-      }
-    }
+// DELETE inventaris
+// Jika frontend memanggil: DELETE /api/users/inventaris/123
+router.delete('/inventaris/:id', verifyToken, bindInventaris(inventarisController.deleteInventaris));
 
-    res.status(201).json({
-      success: true,
-      message: `Berhasil import ${results.length} data inventaris`,
-      data: {
-        imported: results,
-        errors: errors,
-        total_processed: jsonData.length,
-        total_success: results.length,
-        total_errors: errors.length
-      }
-    });
+// POST bulk create inventaris from file upload
+router.post('/inventaris/bulk', verifyToken, upload.single('file'), bindInventaris(inventarisController.bulkCreateInventaris));
 
-  } catch (error) {
-    console.error('Bulk upload error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error processing bulk upload',
-      error: error.message
-    });
-  } finally {
-    // Clean up uploaded file
-    if (filePath && fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-        console.log('File cleaned up:', filePath);
-      } catch (err) {
-        console.error('Error deleting file:', err);
-      }
-    }
-  }
-});
 
 // POST create inventaris - ADD AFTER GET inventaris
 router.post('/inventaris/create', verifyToken, async (req, res) => {

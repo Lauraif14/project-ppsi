@@ -1,7 +1,7 @@
+// routes/absensiRoutes.js
+
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
-const db = require('../db');
 const { verifyToken } = require('../middleware/auth');
 const axios = require('axios'); 
 const sharp = require('sharp');
@@ -86,11 +86,8 @@ router.post('/masuk', verifyToken, upload.single('foto_absen'), async (req, res)
         await db.query('INSERT INTO absensi SET ?', newAbsen);
         res.status(201).json({ message: 'Absen masuk berhasil dicatat.' });
 
-    } catch (error) {
-        console.error("Error saat absen masuk:", error);
-        res.status(500).json({ message: 'Gagal mencatat absen masuk.' });
-    }
-});
+// Helper untuk binding agar kode lebih rapi
+const bind = (method) => method.bind(absensiController);
 
 // 4. Endpoint Kirim Laporan Inventaris
 router.post('/submit-checklist', verifyToken, async (req, res) => {
@@ -124,21 +121,11 @@ router.post('/keluar', verifyToken, upload.single('foto_absen'), async (req, res
 
         if (!req.file) return res.status(400).json({ message: 'Foto absensi keluar diperlukan.' });
 
-        const [rows] = await db.query('SELECT * FROM absensi WHERE id = ? AND user_id = ?', [absensiId, userId]);
-        if (rows.length === 0) {
-            return res.status(404).json({ message: 'Sesi absensi tidak ditemukan.' });
-        }
-        const sesiAbsen = rows[0];
+// Endpoint Get Riwayat Absensi
+router.get('/history', verifyToken, bind(absensiController.getAbsensiHistory));
 
-        if (sesiAbsen.waktu_keluar) {
-            return res.status(400).json({ message: 'Anda sudah melakukan absen keluar untuk sesi ini.' });
-        }
-        
-        const waktuMasuk = new Date(sesiAbsen.waktu_masuk);
-        const selisihMenit = (new Date() - waktuMasuk) / (1000 * 60);
-        if (selisihMenit < 120) {
-            return res.status(400).json({ message: `Anda baru piket ${Math.floor(selisihMenit)} menit. Absen keluar bisa dilakukan setelah 2 jam.` });
-        }
+// Endpoint Laporan Absensi Berdasarkan Tanggal
+router.get('/laporan', verifyToken, bind(absensiController.getLaporanAbsensi));
 
         if (!sesiAbsen.checklist_submitted) {
             return res.status(400).json({ message: 'Harap kirim checklist inventaris sebelum absen keluar.' });
@@ -156,12 +143,8 @@ router.post('/keluar', verifyToken, upload.single('foto_absen'), async (req, res
             [new Date(), foto_path_keluar, latitude, longitude, absensiId]
         );
 
-        res.json({ message: 'Absen keluar berhasil dicatat. Selamat beristirahat!' });
-    } catch (error) {
-        console.error("Error saat absen keluar:", error);
-        res.status(500).json({ message: 'Gagal mencatat absen keluar.' });
-    }
-});
+// Endpoint Absensi Hari Ini (untuk admin/pengurus)
+router.get('/today', verifyToken, bind(absensiController.getTodayAbsensi));
 
 // 6. Endpoint Get Status Absensi Terkini
 router.get('/status', verifyToken, async (req, res) => {
