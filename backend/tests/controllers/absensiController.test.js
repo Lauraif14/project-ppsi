@@ -33,6 +33,16 @@ describe('AbsensiController (OOP)', () => {
     let req;
     let res;
 
+    beforeAll(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        console.error.mockRestore();
+        console.log.mockRestore();
+    });
+
     // Persiapan sebelum setiap test
     beforeEach(() => {
         jest.clearAllMocks();

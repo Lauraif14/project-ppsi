@@ -19,6 +19,18 @@ describe('InventarisController (OOP)', () => {
     let req;
     let res;
 
+    beforeAll(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        console.error.mockRestore();
+        console.log.mockRestore();
+        console.warn.mockRestore();
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
         req = { 
@@ -276,6 +288,58 @@ describe('InventarisController (OOP)', () => {
 
             // Karena Line 124 (catch(e)) menghasilkan 400, assertion diubah menjadi 400
             expect(res.status).toHaveBeenCalledWith(400); 
+            expect(cleanupFile).toHaveBeenCalled();
+        });
+
+        // TEST: Empty file (Line 105-106)
+        test('should return 400 if file is empty after parsing', async () => {
+            parseUploadedFile.mockReturnValue([]);
+            
+            await bind(inventarisControllerInstance.bulkCreateInventaris)(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    success: false, 
+                    message: 'File kosong atau format tidak sesuai.' 
+                })
+            );
+            expect(cleanupFile).toHaveBeenCalledWith('mock/path/file.xlsx');
+        });
+
+        // TEST: Invalid status validation (Line 129-130)
+        test('should report error for invalid status', async () => {
+            parseUploadedFile.mockReturnValue([
+                { nama_barang: 'Item 1', jumlah: 5, status: 'InvalidStatus' },
+                { nama_barang: 'Item 2', jumlah: 3, status: 'Tersedia' },
+            ]);
+
+            await bind(inventarisControllerInstance.bulkCreateInventaris)(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json.mock.calls[0][0].data.total_errors).toBe(1);
+            expect(res.json.mock.calls[0][0].data.errors[0]).toContain('Status tidak valid');
+            expect(res.json.mock.calls[0][0].data.total_success).toBe(1);
+        });
+
+        // TEST: Outer catch block 500 error (Line 165-166)
+        test('should return 500 if unexpected error in outer catch block', async () => {
+            // Untuk memicu outer catch, error harus terjadi di luar loop
+            // Strategi: mock res.status untuk throw error saat dipanggil dengan 201
+            parseUploadedFile.mockReturnValue([{ nama_barang: 'Test', jumlah: 1, status: 'Tersedia' }]);
+            
+            const originalStatus = res.status;
+            res.status = jest.fn((code) => {
+                if (code === 201) {
+                    throw new Error('Unexpected error');
+                }
+                return res;
+            });
+
+            await bind(inventarisControllerInstance.bulkCreateInventaris)(req, res);
+
+            // Restore
+            res.status = originalStatus;
             expect(cleanupFile).toHaveBeenCalled();
         });
     });

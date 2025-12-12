@@ -1,5 +1,3 @@
-// tests/models/absensiModel.test.js (FINAL & 100% COVERAGE)
-
 // 1. Mock Database (MENGGANTIKAN KONEKSI DATABASE ASLI)
 const db = require('../../db'); 
 

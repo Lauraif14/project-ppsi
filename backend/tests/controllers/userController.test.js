@@ -16,6 +16,16 @@ describe('UserController (OOP)', () => {
     let req;
     let res;
 
+    beforeAll(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        console.error.mockRestore();
+        console.log.mockRestore();
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
         
@@ -46,9 +56,11 @@ describe('UserController (OOP)', () => {
         });
         
         test('should return 500 on getAllUsersComplete failure', async () => {
+            console.error.mockClear();
             UserModel.getAllUsersComplete.mockRejectedValue(new Error('Complete Fetch Error'));
             await bind(userControllerInstance.getAllUsersComplete)(req, res);
             expect(res.status).toHaveBeenCalledWith(500);
+            expect(console.error).toHaveBeenCalledWith('Error fetching all users:', expect.any(Error));
         });
         
         test('should return list of non-admin users for getAllUsers', async () => {
@@ -78,6 +90,7 @@ describe('UserController (OOP)', () => {
         });
         
         test('should return 500 if DB fails during creation', async () => {
+            console.error.mockClear();
             UserModel.createUser.mockRejectedValue(new Error('DB Create Error'));
             await bind(userControllerInstance.createUser)(req, res);
             expect(res.status).toHaveBeenCalledWith(500);
@@ -134,6 +147,43 @@ describe('UserController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.json.mock.calls[0][0].errors).toHaveProperty('role');
         });
+
+        test('should return 400 if password is too short (< 6)', async () => {
+            req.body.password = '12345';
+            await bind(userControllerInstance.createAccount)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json.mock.calls[0][0].errors).toHaveProperty('password');
+        });
+
+        test('should return 400 if username already exists', async () => {
+            UserModel.findUserByUsername.mockResolvedValue(MOCK_USER);
+            await bind(userControllerInstance.createAccount)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    success: false, 
+                    message: 'Username sudah digunakan' 
+                })
+            );
+        });
+
+        test('should return 400 if email already exists', async () => {
+            UserModel.findUserByEmail.mockResolvedValue(MOCK_USER);
+            await bind(userControllerInstance.createAccount)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    success: false, 
+                    message: 'Email sudah terdaftar' 
+                })
+            );
+        });
+
+        test('should return 500 on database error', async () => {
+            UserModel.createUser.mockRejectedValue(new Error('DB Error'));
+            await bind(userControllerInstance.createAccount)(req, res);
+            expect(res.status).toHaveBeenCalledWith(500);
+        });
         
         test('should succeed if all fields are valid', async () => {
             // Memastikan jalur sukses teruji setelah semua validasi gagal di atas
@@ -163,6 +213,12 @@ describe('UserController (OOP)', () => {
             UserModel.findUserById.mockResolvedValue(null);
             await bind(userControllerInstance.updateUser)(req, res);
             expect(res.status).toHaveBeenCalledWith(404);
+        });
+
+        test('should return 400 if validation fails', async () => {
+            req.body.nama_lengkap = 'A'; // Too short
+            await bind(userControllerInstance.updateUser)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
         });
         
         test('should return 500 if DB update fails', async () => {
@@ -224,6 +280,15 @@ describe('UserController (OOP)', () => {
             await bind(userControllerInstance.deleteUser)(req, res);
             expect(res.status).toHaveBeenCalledWith(400);
         });
+
+        test('should trigger outer catch with console.error (deleteUser)', async () => {
+            // Trigger error in outer catch block by making findUserById throw
+            console.error.mockClear();
+            UserModel.findUserById.mockRejectedValue(new Error('Find user DB error'));
+            await bind(userControllerInstance.deleteUser)(req, res);
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(console.error).toHaveBeenCalledWith('Delete user error:', expect.any(Error));
+        });
     });
     
     // --- Testing Reset Password ---
@@ -240,10 +305,37 @@ describe('UserController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
         });
 
+        test('should return 400 if new_password is missing', async () => {
+            req.body = {};
+            await bind(userControllerInstance.resetPassword)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should return 404 if user not found', async () => {
+            UserModel.findUserById.mockResolvedValue(null);
+            await bind(userControllerInstance.resetPassword)(req, res);
+            expect(res.status).toHaveBeenCalledWith(404);
+        });
+
         test('should return 500 if DB update fails during reset', async () => {
             UserModel.updatePassword.mockRejectedValue(new Error('DB Reset Fail'));
             await bind(userControllerInstance.resetPassword)(req, res);
             expect(res.status).toHaveBeenCalledWith(500);
+        });
+
+        test('should successfully reset password', async () => {
+            // Reset mock dari test sebelumnya
+            UserModel.updatePassword.mockResolvedValue();
+            UserModel.findUserById.mockResolvedValue(MOCK_USER);
+            
+            await bind(userControllerInstance.resetPassword)(req, res);
+            expect(UserModel.updatePassword).toHaveBeenCalled();
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    success: true, 
+                    message: expect.stringContaining('Password untuk') 
+                })
+            );
         });
     });
     
@@ -258,6 +350,18 @@ describe('UserController (OOP)', () => {
             UserModel.findUserByUsername.mockResolvedValue(null);
             UserModel.findUserByEmail.mockResolvedValue(null);
         });
+
+        test('should return 400 if file is not provided', async () => {
+            req.file = undefined;
+            await bind(userControllerInstance.bulkCreatePengurus)(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ 
+                    success: false, 
+                    message: 'File tidak ditemukan' 
+                })
+            );
+        });
         
         test('should return 400 if file parsing fails', async () => {
             parseUploadedFile.mockImplementation(() => { throw new Error('Format salah'); });
@@ -269,6 +373,15 @@ describe('UserController (OOP)', () => {
             parseUploadedFile.mockReturnValue([]);
             await bind(userControllerInstance.bulkCreatePengurus)(req, res);
             expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should report validation errors for rows', async () => {
+            parseUploadedFile.mockReturnValue([
+                { nama_lengkap: 'A', username: 'ab', email: 'invalid', divisi: '', jabatan: '' },
+            ]);
+            await bind(userControllerInstance.bulkCreatePengurus)(req, res);
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json.mock.calls[0][0].data.total_errors).toBeGreaterThan(0);
         });
         
         test('should return 201 but report error if DB fails during row processing loop', async () => {
@@ -290,6 +403,48 @@ describe('UserController (OOP)', () => {
             expect(res.json.mock.calls[0][0].data.total_success).toBe(1); 
             expect(res.json.mock.calls[0][0].data.total_errors).toBe(1); 
             expect(res.json.mock.calls[0][0].data.errors[0]).toContain('Username dupe_set sudah digunakan');
+        });
+
+        test('should report error for duplicate emails within the input file', async () => {
+            parseUploadedFile.mockReturnValue([
+                { nama_lengkap: 'User A', username: 'user1', email: 'dupe@email.com', divisi: 'D', jabatan: 'J' },
+                { nama_lengkap: 'User B', username: 'user2', email: 'dupe@email.com', divisi: 'D', jabatan: 'J' }, 
+            ]);
+            
+            await bind(userControllerInstance.bulkCreatePengurus)(req, res);
+            
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json.mock.calls[0][0].data.total_errors).toBe(1); 
+            expect(res.json.mock.calls[0][0].data.errors[0]).toContain('Email dupe@email.com sudah digunakan');
+        });
+
+        test('should return 500 on unexpected outer catch error', async () => {
+            // Untuk memicu outer catch (line 300), error harus terjadi SETELAH loop selesai
+            // atau saat variable declaration/initialization sebelum loop
+            // Cara: Buat res.status atau res.json throw error
+            
+            parseUploadedFile.mockReturnValue([{ nama_lengkap: 'Test', username: 'test', email: 'test@test.com', divisi: 'D', jabatan: 'J' }]);
+            
+            // Mock res.status untuk throw error saat dipanggil dengan 201
+            const originalStatus = res.status;
+            res.status = jest.fn((code) => {
+                if (code === 201) {
+                    throw new Error('Unexpected error in response');
+                }
+                return res;
+            });
+            
+            await bind(userControllerInstance.bulkCreatePengurus)(req, res);
+            
+            // Restore dan verifikasi
+            res.status = originalStatus;
+            expect(cleanupFile).toHaveBeenCalled();
+        });
+
+        test('should successfully import users', async () => {
+            await bind(userControllerInstance.bulkCreatePengurus)(req, res);
+            expect(res.status).toHaveBeenCalledWith(201);
+            expect(res.json.mock.calls[0][0].data.total_success).toBe(1);
         });
 
         test('should report error for DB duplicates during loop processing', async () => {

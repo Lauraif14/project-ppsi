@@ -69,6 +69,15 @@ describe('InventarisModel', () => {
             expect(mockQuery.mock.calls[0][0]).toBe('SELECT id, jumlah FROM inventaris WHERE nama_barang = ?');
             expect(result).toEqual(mockItem);
         });
+
+        test('findInventarisByName should return null if not found', async () => {
+            mockQuery.mockResolvedValue([[]]);
+
+            const result = await InventarisModel.findInventarisByName('NonExistent');
+
+            expect(mockQuery).toHaveBeenCalledTimes(1);
+            expect(result).toBeNull();
+        });
     });
 
     // --- CREATE OPERATIONS ---

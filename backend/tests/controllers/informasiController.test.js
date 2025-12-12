@@ -26,6 +26,18 @@ describe('InformasiController (MVC & File Handling)', () => {
     const EXISTING_INFO = { id: 5, judul: 'Old Title', file_path: EXISTING_FILE_PATH };
     const INFO_WITHOUT_FILE = { id: 6, judul: 'Text Info', file_path: null };
 
+    beforeAll(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        console.error.mockRestore();
+        console.warn.mockRestore();
+        console.log.mockRestore();
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
         controller = informasiControllerInstance; 

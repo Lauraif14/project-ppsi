@@ -23,6 +23,16 @@ describe('PiketController (OOP)', () => {
     // Ambil instance controller yang sudah diexport
     const piketControllerInstance = require('../../controllers/piketController'); 
 
+    beforeAll(() => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+    });
+
+    afterAll(() => {
+        console.error.mockRestore();
+        console.log.mockRestore();
+    });
+
     beforeEach(() => {
         jest.clearAllMocks();
         

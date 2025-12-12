@@ -39,6 +39,12 @@ describe('UserModel', () => {
             expect(result).toEqual(mockUser);
         });
 
+        test('findUserByIdentifier should return null if not found', async () => {
+            mockQuery.mockResolvedValue([[]]);
+            const result = await UserModel.findUserByIdentifier('notfound@test.com');
+            expect(result).toBeNull();
+        });
+
         test('findUserByResetToken should check both token and expiry', async () => {
             const mockToken = '123abc';
             const mockExpiry = 1735689600000; 
@@ -48,6 +54,25 @@ describe('UserModel', () => {
             expect(mockQuery).toHaveBeenCalledTimes(1);
             expect(mockQuery.mock.calls[0][0]).toBe('SELECT * FROM users WHERE resetToken = ? AND resetTokenExpiry > ?');
         });
+
+        test('findUserByResetToken should return null if not found', async () => {
+            mockQuery.mockResolvedValue([[]]);
+            const result = await UserModel.findUserByResetToken('invalid', 123456);
+            expect(result).toBeNull();
+        });
+
+        test('findUserByEmail should return user', async () => {
+            const mockUser = { id: 3, email: 'test@test.com' };
+            mockQuery.mockResolvedValue([[mockUser]]);
+            const result = await UserModel.findUserByEmail('test@test.com');
+            expect(result).toEqual(mockUser);
+        });
+
+        test('findUserByEmail should return null if not found', async () => {
+            mockQuery.mockResolvedValue([[]]);
+            const result = await UserModel.findUserByEmail('notfound@test.com');
+            expect(result).toBeNull();
+        });
         
         test('findUserByUsername should use db.execute', async () => {
             const mockRow = { id: 5 };
@@ -56,6 +81,12 @@ describe('UserModel', () => {
             const result = await UserModel.findUserByUsername('adminuser');
             expect(mockExecute).toHaveBeenCalledTimes(1);
             expect(mockExecute.mock.calls[0][0]).toBe('SELECT id FROM users WHERE username = ?');
+        });
+
+        test('findUserByUsername should return null if not found', async () => {
+            mockExecute.mockResolvedValue([[]]);
+            const result = await UserModel.findUserByUsername('notfound');
+            expect(result).toBeNull();
         });
         
         test('findUserByNamaLengkap should call db.query with correct WHERE clause', async () => {
@@ -72,6 +103,23 @@ describe('UserModel', () => {
         test('findUserByNamaLengkap returns null if not found', async () => {
             mockQuery.mockResolvedValue([[]]);
             const result = await UserModel.findUserByNamaLengkap('NotFound');
+            expect(result).toBeNull();
+        });
+
+        test('findUserById should return user data', async () => {
+            const mockUser = { id: 5, username: 'testuser', email: 'test@test.com' };
+            mockExecute.mockResolvedValue([[mockUser]]);
+
+            const result = await UserModel.findUserById(5);
+            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(mockExecute.mock.calls[0][0]).toBe('SELECT id, nama_lengkap, username, email, jabatan, role, divisi FROM users WHERE id = ?');
+            expect(result).toEqual(mockUser);
+        });
+
+        test('findUserById should return null if not found', async () => {
+            mockExecute.mockResolvedValue([[]]);
+
+            const result = await UserModel.findUserById(999);
             expect(result).toBeNull();
         });
     });

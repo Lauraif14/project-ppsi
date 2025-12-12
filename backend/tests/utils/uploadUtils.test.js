@@ -1,6 +1,9 @@
 // tests/utils/uploadUtils.test.js
 
-// 1. Mock Dependencies (di tingkat atas file)
+// 1. Mock process.cwd() SEBELUM require module apapun
+process.cwd = jest.fn(() => '/mock/root');
+
+// 2. Mock Dependencies (di tingkat atas file)
 const path = require('path');
 const fs = require('fs');
 const xlsx = require('xlsx');
@@ -9,6 +12,13 @@ const xlsx = require('xlsx');
 jest.mock('path');
 jest.mock('fs');
 jest.mock('xlsx');
+
+// Mock path.join SEBELUM require uploadUtils
+path.join.mockImplementation((...args) => args.join('/'));
+path.extname.mockImplementation((filename) => {
+    const ext = filename.split('.').pop();
+    return `.${ext}`;
+});
 
 // --- Mock Multer yang Benar ---
 const mockMulter = jest.fn((options) => {
@@ -41,15 +51,6 @@ describe('uploadUtils', () => {
     const MOCK_CSV_DATA = 'kode,nama,status\nK001,Laptop,Tersedia\nK002,Mouse,Rusak\n';
     
     beforeAll(() => {
-        // FIX: Pastikan path.join & process.cwd di-mock untuk menghasilkan EXPECTED_UPLOAD_DIR
-        path.join.mockImplementation((...args) => args.join('/'));
-        process.cwd = jest.fn(() => '/mock/root');
-
-        path.extname.mockImplementation((filename) => {
-            const ext = filename.split('.').pop();
-            return `.${ext}`;
-        });
-        
         global.console.error = jest.fn();
         
         // Tangkap options Multer dan Storage (Hanya dipanggil sekali saat require)
@@ -124,6 +125,21 @@ describe('uploadUtils', () => {
             // Test case 1: Allowed (.xlsx)
             filterFn({}, { originalname: 'data.xlsx' }, mockCb);
             expect(mockCb).toHaveBeenCalledWith(null, true);
+        });
+
+        test('should reject non-allowed file types', () => {
+            const filterFn = multerOptions.fileFilter; 
+            let mockCb = jest.fn();
+
+            // Test case: Not allowed (.pdf)
+            filterFn({}, { originalname: 'document.pdf' }, mockCb);
+            
+            expect(mockCb).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: 'File type tidak didukung. Gunakan .xlsx, .xls, atau .csv'
+                }),
+                false
+            );
         });
         
         // FIX 1: Tes untuk destination
