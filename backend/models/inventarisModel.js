@@ -8,9 +8,9 @@ const InventarisModel = {
         const [rows] = await db.query('SELECT id, kode_barang, nama_barang, status FROM inventaris');
         return rows;
     },
-    
+
     // Dipanggil oleh getAllInventaris (Controller)
-    getAllInventaris: async () => { 
+    getAllInventaris: async () => {
         const [rows] = await db.execute(`
             SELECT id, nama_barang, kode_barang, jumlah, status, created_at 
             FROM inventaris 
@@ -24,7 +24,7 @@ const InventarisModel = {
         const [rows] = await db.query('SELECT * FROM inventaris WHERE id = ?', [id]);
         return rows[0] || null;
     },
-    
+
     // Dipanggil oleh createInventaris, bulkCreateInventaris
     createInventaris: async (data) => {
         const [result] = await db.query(
@@ -48,12 +48,21 @@ const InventarisModel = {
         );
     },
 
+    // Dipanggil oleh updateInventaris (Controller)
+    updateInventaris: async (id, data) => {
+        const [result] = await db.query(
+            'UPDATE inventaris SET nama_barang = ?, kode_barang = ?, jumlah = ?, status = ? WHERE id = ?',
+            [data.nama_barang, data.kode_barang, data.jumlah, data.status, id]
+        );
+        return result.affectedRows;
+    },
+
     // Dipanggil oleh deleteInventaris
     deleteInventaris: async (id) => {
         const [result] = await db.query('DELETE FROM inventaris WHERE id = ?', [id]);
         return result.affectedRows;
     },
-    
+
     // Dipanggil oleh submitChecklist
     updateStatus: async (inventarisId, status) => {
         await db.query(

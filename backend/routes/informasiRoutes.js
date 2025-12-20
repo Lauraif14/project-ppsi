@@ -1,53 +1,38 @@
-// backend/routes/informasiRoutes.js
 const express = require('express');
-const db = require('../db');
-const { verifyToken, verifyAdmin } = require('../middleware/auth');
 const router = express.Router();
+const informasiController = require('../controllers/informasiController');
+const { verifyToken, verifyAdmin } = require('../middleware/auth');
+const { uploadInformasi } = require('../utils/uploadUtils');
 
-// Endpoint untuk PENGURUS (user) - Hanya mengambil data
-router.get('/', verifyToken, async (req, res) => {
-    try {
-        const [informasi] = await db.query('SELECT * FROM informasi ORDER BY kategori, judul');
-        res.json(informasi);
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal mengambil informasi.' });
-    }
-});
+/**
+ * RUTE UNTUK PENGURUS & ADMIN
+ */
+// Mengambil semua informasi (SOP/Panduan/Informasi Lain)
+router.get('/', verifyToken, informasiController.getAllInformasi);
 
-// === Rute Khusus Admin ===
+// Mengambil informasi aktif untuk dashboard
+router.get('/active', verifyToken, informasiController.getActiveInformasi);
 
-// Endpoint untuk ADMIN - Membuat informasi baru
-router.post('/', verifyAdmin, async (req, res) => {
-    try {
-        const { judul, isi, kategori } = req.body;
-        await db.query('INSERT INTO informasi (judul, isi, kategori) VALUES (?, ?, ?)', [judul, isi, kategori]);
-        res.status(201).json({ message: 'Informasi berhasil dibuat.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal membuat informasi.' });
-    }
-});
+/**
+ * RUTE KHUSUS ADMIN (MANAJEMEN DOKUMEN)
+ */
+// Membuat informasi baru dengan upload file
+router.post(
+    '/',
+    verifyAdmin,
+    uploadInformasi.single('file'),
+    informasiController.createInformasi
+);
 
-// Endpoint untuk ADMIN - Memperbarui informasi
-router.put('/:id', verifyAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { judul, isi, kategori } = req.body;
-        await db.query('UPDATE informasi SET judul = ?, isi = ?, kategori = ? WHERE id = ?', [judul, isi, kategori, id]);
-        res.json({ message: 'Informasi berhasil diperbarui.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal memperbarui informasi.' });
-    }
-});
+// Memperbarui informasi (bisa update teks saja atau dengan file baru)
+router.put(
+    '/:id',
+    verifyAdmin,
+    uploadInformasi.single('file'),
+    informasiController.updateInformasi
+);
 
-// Endpoint untuk ADMIN - Menghapus informasi
-router.delete('/:id', verifyAdmin, async (req, res) => {
-    try {
-        const { id } = req.params;
-        await db.query('DELETE FROM informasi WHERE id = ?', [id]);
-        res.json({ message: 'Informasi berhasil dihapus.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Gagal menghapus informasi.' });
-    }
-});
+// Menghapus informasi dan file fisiknya
+router.delete('/:id', verifyAdmin, informasiController.deleteInformasi);
 
 module.exports = router;

@@ -1,10 +1,9 @@
-// backend/models/informasiModel.js
-
 class InformasiModel {
     constructor(db) {
         this.db = db;
     }
 
+    // Mengambil semua data dengan sorting kategori tertentu
     async getAll(kategori) {
         let sql = 'SELECT * FROM informasi';
         const params = [];
@@ -14,9 +13,18 @@ class InformasiModel {
             params.push(kategori);
         }
 
-        sql += ' ORDER BY FIELD(kategori, "SOP","Panduan","Informasi Lain"), created_at DESC';
+        // Sorting: SOP -> Panduan -> Informasi Lain
+        sql += ' ORDER BY FIELD(kategori, "SOP", "Panduan", "Informasi Lain"), created_at DESC';
         const [rows] = await this.db.query(sql, params);
         return rows;
+    }
+
+    // Mengambil informasi aktif untuk dashboard
+    async getActiveInfo() {
+        const [rows] = await this.db.query(
+            'SELECT * FROM informasi WHERE kategori = "Informasi Lain" AND is_active = TRUE LIMIT 1'
+        );
+        return rows[0] || null;
     }
 
     async findById(id) {
@@ -24,24 +32,36 @@ class InformasiModel {
         return rows[0];
     }
 
-    async create(judul, isi, kategori, file_path) {
+    async create(judul, isi, kategori, file_path, is_active = false) {
+        // Jika kategori Informasi Lain dan is_active = true, nonaktifkan yang lain
+        if (kategori === 'Informasi Lain' && is_active) {
+            await this.db.query('UPDATE informasi SET is_active = FALSE WHERE kategori = "Informasi Lain"');
+        }
+
         const [result] = await this.db.query(
-            'INSERT INTO informasi (judul, isi, kategori, file_path) VALUES (?, ?, ?, ?)',
-            [judul, isi || null, kategori || 'Informasi Lain', file_path]
+            'INSERT INTO informasi (judul, isi, kategori, file_path, is_active) VALUES (?, ?, ?, ?, ?)',
+            [judul, isi || null, kategori || 'Informasi Lain', file_path || null, is_active]
         );
         return result.insertId;
     }
 
-    async update(id, judul, isi, kategori, file_path) {
-        if (file_path) {
+    async update(id, judul, isi, kategori, file_path, is_active) {
+        // Jika kategori Informasi Lain dan is_active = true, nonaktifkan yang lain
+        if (kategori === 'Informasi Lain' && is_active) {
+            await this.db.query('UPDATE informasi SET is_active = FALSE WHERE kategori = "Informasi Lain" AND id != ?', [id]);
+        }
+
+        // Jika ada file baru, update kolom file_path
+        if (file_path !== undefined) {
             await this.db.query(
-                'UPDATE informasi SET judul=?, isi=?, kategori=?, file_path=? WHERE id=?',
-                [judul, isi, kategori, file_path, id]
+                'UPDATE informasi SET judul=?, isi=?, kategori=?, file_path=?, is_active=? WHERE id=?',
+                [judul, isi, kategori, file_path, is_active, id]
             );
         } else {
+            // Jika tidak ada file baru, file_path lama dipertahankan
             await this.db.query(
-                'UPDATE informasi SET judul=?, isi=?, kategori=? WHERE id=?',
-                [judul, isi, kategori, id]
+                'UPDATE informasi SET judul=?, isi=?, kategori=?, is_active=? WHERE id=?',
+                [judul, isi, kategori, is_active, id]
             );
         }
     }
@@ -52,7 +72,7 @@ class InformasiModel {
     }
 }
 
-// EKSPOR INSTANCE MODEL (DIJALANKAN DENGAN DB DARI INDEX/APP START)
+// Impor koneksi DB
 const db = require('../db');
 const informasiModel = new InformasiModel(db);
 

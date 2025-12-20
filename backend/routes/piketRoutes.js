@@ -13,9 +13,9 @@ function getIndonesianDayName(date) {
 router.get('/pengurus', verifyToken, async (req, res) => {
   try {
     const [rows] = await db.execute(
-      'SELECT id, nama_lengkap, jabatan FROM users WHERE role = "user" ORDER BY nama_lengkap'
+      'SELECT id, nama_lengkap, divisi FROM users WHERE role = "user" ORDER BY nama_lengkap'
     );
-    
+
     res.json({
       success: true,
       data: rows
@@ -33,7 +33,7 @@ router.get('/pengurus', verifyToken, async (req, res) => {
 router.get('/jadwal', verifyToken, async (req, res) => {
   try {
     console.log('GET /jadwal called');
-    
+
     // Check if table exists first
     const [tables] = await db.execute("SHOW TABLES LIKE 'jadwal_piket'");
     if (tables.length === 0) {
@@ -43,7 +43,7 @@ router.get('/jadwal', verifyToken, async (req, res) => {
         error: 'Table not found'
       });
     }
-    
+
     const query = `
       SELECT 
         jp.id, 
@@ -58,18 +58,18 @@ router.get('/jadwal', verifyToken, async (req, res) => {
         FIELD(jp.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'),
         u.nama_lengkap ASC
     `;
-    
+
     console.log('Executing query:', query);
-    
+
     const [rows] = await db.execute(query);
-    
+
     console.log('Query result:', rows);
-    
+
     // Group by hari
     const groupedSchedule = {};
     rows.forEach(row => {
       const hari = row.hari;
-      
+
       if (!groupedSchedule[hari]) {
         groupedSchedule[hari] = [];
       }
@@ -81,7 +81,7 @@ router.get('/jadwal', verifyToken, async (req, res) => {
         hari: row.hari
       });
     });
-    
+
     res.json({
       success: true,
       data: groupedSchedule
@@ -100,9 +100,9 @@ router.get('/jadwal', verifyToken, async (req, res) => {
 router.post('/jadwal', verifyToken, async (req, res) => {
   try {
     console.log('POST /jadwal called with body:', req.body);
-    
+
     const { schedule } = req.body;
-    
+
     if (!schedule || typeof schedule !== 'object') {
       return res.status(400).json({
         success: false,
@@ -127,10 +127,10 @@ router.post('/jadwal', verifyToken, async (req, res) => {
     // Insert new schedule berdasarkan hari
     let totalInserted = 0;
     let errors = [];
-    
+
     for (const [hari, namaList] of Object.entries(schedule)) {
       console.log(`Processing hari: ${hari} with names:`, namaList);
-      
+
       for (const nama of namaList) {
         try {
           // Find user_id by nama_lengkap
@@ -138,17 +138,17 @@ router.post('/jadwal', verifyToken, async (req, res) => {
             'SELECT id FROM users WHERE nama_lengkap = ? AND role = "user" LIMIT 1',
             [nama]
           );
-          
+
           if (userRows.length > 0) {
             const user_id = userRows[0].id;
-            
+
             console.log(`Inserting: user_id=${user_id}, hari=${hari}, nama=${nama}`);
-            
+
             await db.execute(
               'INSERT INTO jadwal_piket (user_id, hari) VALUES (?, ?)',
               [user_id, hari]
             );
-            
+
             totalInserted++;
             console.log(`Successfully inserted ${nama} for ${hari}`);
           } else {
@@ -213,7 +213,7 @@ router.delete('/jadwal', verifyToken, async (req, res) => {
 router.post('/jadwal/generate', verifyToken, async (req, res) => {
   try {
     console.log('POST /jadwal/generate called with body:', req.body);
-    
+
     const { assignments_per_day = 3 } = req.body;
 
     // Get all active pengurus
@@ -231,19 +231,19 @@ router.post('/jadwal/generate', verifyToken, async (req, res) => {
     // Generate schedule untuk hari Senin-Jumat
     const pengurus = pengurusRows.map(p => p.nama_lengkap);
     const shuffledPengurus = [...pengurus].sort(() => 0.5 - Math.random());
-    
+
     const weekdays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
     const schedule = {};
-    
+
     weekdays.forEach((hari, index) => {
       const startIdx = (index * assignments_per_day) % shuffledPengurus.length;
       const assigned = [];
-      
+
       for (let i = 0; i < assignments_per_day; i++) {
         const pengurusIdx = (startIdx + i) % shuffledPengurus.length;
         assigned.push(shuffledPengurus[pengurusIdx]);
       }
-      
+
       schedule[hari] = assigned;
     });
 
@@ -285,7 +285,7 @@ router.get('/absensi', verifyToken, async (req, res) => {
   try {
     // Convert date string to date object
     const targetDate = new Date(date);
-    
+
     if (isNaN(targetDate.getTime())) {
       return res.status(400).json({
         success: false,

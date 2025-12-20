@@ -3,6 +3,7 @@
 const AbsensiController = require('../../controllers/absensiController');
 const AbsensiModel = require('../../models/absensiModel');
 const InventarisModel = require('../../models/inventarisModel');
+const JadwalModel = require('../../models/jadwalModel');
 
 // Mocking eksternal/internal modules
 const axios = require('axios');
@@ -10,11 +11,12 @@ const sharp = require('sharp');
 const path = require('path');
 
 // Import instance class
-const absensiControllerInstance = require('../../controllers/absensiController'); 
+const absensiControllerInstance = require('../../controllers/absensiController');
 
 // Mocking models
 jest.mock('../../models/absensiModel');
 jest.mock('../../models/inventarisModel');
+jest.mock('../../models/jadwalModel');
 
 // Mocking eksternal libraries
 jest.mock('axios');
@@ -22,20 +24,20 @@ jest.mock('sharp');
 jest.mock('path');
 
 // Variabel global untuk melacak panggilan sharp().toFile
-let mockToFile; 
+let mockToFile;
 
 // Mocking Date untuk mengontrol waktu (penting untuk Watermark dan Absen Keluar)
 const MOCK_DATE = new Date('2025-11-17T08:00:00.000Z'); // Waktu Masuk
 const MOCK_DATE_KELUAR = new Date('2025-11-17T11:00:00.000Z'); // Waktu Keluar (3 jam kemudian)
-const REAL_DATE = Date; 
+const REAL_DATE = Date;
 
 describe('AbsensiController (OOP)', () => {
     let req;
     let res;
 
     beforeAll(() => {
-        jest.spyOn(console, 'error').mockImplementation(() => {});
-        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => { });
+        jest.spyOn(console, 'log').mockImplementation(() => { });
     });
 
     afterAll(() => {
@@ -46,7 +48,7 @@ describe('AbsensiController (OOP)', () => {
     // Persiapan sebelum setiap test
     beforeEach(() => {
         jest.clearAllMocks();
-        
+
         // --- 1. SETUP MOCK SHARP YANG BISA DILACAK ---
         mockToFile = jest.fn().mockResolvedValue(true);
 
@@ -57,11 +59,11 @@ describe('AbsensiController (OOP)', () => {
             toFile: mockToFile, // <-- Gunakan mockToFile untuk verifikasi
         }));
         // ---------------------------------------------
-        
+
         // Mock objek Request dan Response
         req = {
             body: {},
-            user: { id: 1 }, 
+            user: { id: 1 },
             file: { buffer: Buffer.from('mockImageBuffer') },
             protocol: 'http',
             get: jest.fn().mockReturnValue('localhost:3000'),
@@ -75,7 +77,7 @@ describe('AbsensiController (OOP)', () => {
 
         // Mock process.env
         process.env.OPENCAGE_API_KEY = 'mock_key';
-        
+
         // Mock path
         path.join.mockImplementation((...args) => args.join('/')); // Menggunakan forward slash untuk konsistensi di mock logic
     });
@@ -93,13 +95,18 @@ describe('AbsensiController (OOP)', () => {
                     return input ? new REAL_DATE(input) : MOCK_DATE;
                 }
             };
-            
+
             // Mock axios untuk geocoding default sukses
             axios.get.mockResolvedValue({
                 data: {
                     results: [{ formatted: 'Gedung Mock' }]
                 }
             });
+
+            // Mock JadwalModel - user dijadwalkan hari ini
+            JadwalModel.getJadwalByDate.mockResolvedValue([
+                { user_id: 1, tanggal: '2025-11-17', hari: 'Senin' }
+            ]);
 
             // Mock Model default
             AbsensiModel.findActiveSession.mockResolvedValue(null);
@@ -111,7 +118,7 @@ describe('AbsensiController (OOP)', () => {
             // Set body required
             req.body = { latitude: '123', longitude: '456' };
         });
-        
+
         // Test Kasus Sukses
         test('should return 201 and create session with watermark and checklist', async () => {
             await absensiControllerInstance.absenMasuk.bind(absensiControllerInstance)(req, res);
@@ -123,11 +130,11 @@ describe('AbsensiController (OOP)', () => {
 
         // Test Gagal Watermark (Axios Error)
         test('should still proceed and save file even if geocoding/watermark fails', async () => {
-            axios.get.mockRejectedValue(new Error('Geocoding API failed')); 
-            
+            axios.get.mockRejectedValue(new Error('Geocoding API failed'));
+
             await absensiControllerInstance.absenMasuk.bind(absensiControllerInstance)(req, res);
 
-            expect(mockToFile).toHaveBeenCalled(); 
+            expect(mockToFile).toHaveBeenCalled();
             expect(AbsensiModel.createAbsenMasuk).toHaveBeenCalled();
             expect(res.status).toHaveBeenCalledWith(201);
         });
@@ -193,7 +200,7 @@ describe('AbsensiController (OOP)', () => {
         // Test Gagal DB (Error 500)
         test('should return 500 on database error', async () => {
             req.body = { absensiId: 10, checklist: [] };
-            AbsensiModel.updateChecklist.mockRejectedValue(new Error('DB Update Error')); 
+            AbsensiModel.updateChecklist.mockRejectedValue(new Error('DB Update Error'));
 
             await absensiControllerInstance.submitChecklist.bind(absensiControllerInstance)(req, res);
 
@@ -201,7 +208,7 @@ describe('AbsensiController (OOP)', () => {
             expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengirim checklist.' });
         });
     });
-    
+
     // --- Testing absenKeluar ---
     describe('absenKeluar', () => {
         const VALID_SESSION = {
@@ -211,7 +218,7 @@ describe('AbsensiController (OOP)', () => {
             waktu_keluar: null,
             checklist_submitted: true
         };
-        
+
         beforeEach(() => {
             // Mock Date untuk absenKeluar (3 jam setelah MOCK_DATE)
             global.Date = class extends REAL_DATE {
@@ -219,23 +226,23 @@ describe('AbsensiController (OOP)', () => {
                     return input ? new REAL_DATE(input) : MOCK_DATE_KELUAR;
                 }
             };
-            
+
             axios.get.mockResolvedValue({
                 data: { results: [{ formatted: 'Lokasi Keluar Mock' }] }
             });
 
             AbsensiModel.findByIdAndUserId.mockResolvedValue(VALID_SESSION);
             AbsensiModel.updateAbsenKeluar.mockResolvedValue(1);
-            
+
             req.file = { buffer: Buffer.from('mockImageBuffer') };
             req.body = { absensiId: 10, latitude: '789', longitude: '101' };
         });
-        
+
         test('should succeed and update session for valid exit', async () => {
             await absensiControllerInstance.absenKeluar.bind(absensiControllerInstance)(req, res);
             expect(res.json).toHaveBeenCalledWith({ message: 'Absen keluar berhasil dicatat. Selamat beristirahat!' });
         });
-        
+
         // Test Sesi Tidak Ditemukan (404) -> Menutup Baris 133
         test('should return 404 if session ID is not found', async () => {
             AbsensiModel.findByIdAndUserId.mockResolvedValue(null);
@@ -279,7 +286,7 @@ describe('AbsensiController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.json).toHaveBeenCalledWith({ message: 'Anda baru piket 119 menit. Absen keluar bisa dilakukan setelah 2 jam.' });
         });
-        
+
         // Test Gagal DB (Error 500)
         test('should return 500 on database error during updateAbsenKeluar', async () => {
             AbsensiModel.updateAbsenKeluar.mockRejectedValue(new Error('DB Update Error'));
@@ -322,7 +329,7 @@ describe('AbsensiController (OOP)', () => {
             expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil status absensi.' });
         });
     });
-    
+
     // --- Testing getAbsensiHistory ---
     describe('getAbsensiHistory', () => {
         const MOCK_HISTORY = [
@@ -331,15 +338,15 @@ describe('AbsensiController (OOP)', () => {
 
         test('should return history with correct full URLs', async () => {
             AbsensiModel.getHistory.mockResolvedValue(MOCK_HISTORY);
-            
+
             await absensiControllerInstance.getAbsensiHistory.bind(absensiControllerInstance)(req, res);
 
-            const expectedHistory = [{ 
-                ...MOCK_HISTORY[0], 
+            const expectedHistory = [{
+                ...MOCK_HISTORY[0],
                 foto_url: 'http://localhost:3000/uploads/absensi/foto1.jpg',
                 foto_keluar_url: 'http://localhost:3000/uploads/absensi/foto2.jpg',
             }];
-            
+
             expect(res.json).toHaveBeenCalledWith(expectedHistory);
         });
 

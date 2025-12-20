@@ -22,3 +22,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.env
+
+# User uploads and temporary files
+public/uploads/
+test_output.txt
+*.log

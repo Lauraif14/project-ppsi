@@ -3,7 +3,7 @@
 const bcrypt = require('bcryptjs');
 const UserModel = require('../models/userModel');
 // Mengimpor helper dari utils, bukan upload object Multer
-const { parseUploadedFile, cleanupFile } = require('../utils/uploadUtils'); 
+const { parseUploadedFile, cleanupFile } = require('../utils/uploadUtils');
 
 // Variabel Konstan
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,7 +40,7 @@ const validateUserFields = (data) => {
 // -----------------------------------------------------------
 
 class UserController {
-    
+
     // --- CRUD Controllers ---
 
     async getAllUsers(req, res) {
@@ -78,7 +78,7 @@ class UserController {
             // Catatan: UserModel.createUser di model Anda membutuhkan 7 parameter, di sini hanya 4 data + hash.
             // Asumsi: Model lama Anda menangani data yang hilang sebagai null.
             const insertId = await UserModel.createUser({ nama_lengkap, username, divisi, jabatan: null, email: null }, hashedPassword);
-            
+
             res.status(201).json({
                 success: true,
                 message: 'User berhasil dibuat',
@@ -97,7 +97,7 @@ class UserController {
             if (Object.keys(errors).length > 0) {
                 return res.status(400).json({ success: false, message: 'Validation failed', errors });
             }
-            
+
             if (await UserModel.findUserByUsername(data.username)) {
                 return res.status(400).json({ success: false, message: 'Username sudah digunakan', errors: { username: 'Username sudah digunakan' } });
             }
@@ -125,10 +125,21 @@ class UserController {
         try {
             const { id } = req.params;
             const data = req.body;
-            const errors = validateUserFields(data);
-            
-            delete errors.password;
-            
+
+            // Validasi manual yang lebih fleksibel untuk update
+            const errors = {};
+
+            if (data.nama_lengkap !== undefined && (!data.nama_lengkap || data.nama_lengkap.trim().length < 2)) {
+                errors.nama_lengkap = 'Nama lengkap minimal 2 karakter';
+            }
+            if (data.username !== undefined && (!data.username || data.username.trim().length < 3)) {
+                errors.username = 'Username minimal 3 karakter';
+            }
+            if (data.email !== undefined && (!data.email || !emailRegex.test(data.email))) {
+                errors.email = 'Format email tidak valid';
+            }
+            // Jabatan dan divisi boleh kosong saat update
+
             if (Object.keys(errors).length > 0) {
                 return res.status(400).json({ success: false, message: 'Validation failed', errors });
             }
@@ -137,13 +148,24 @@ class UserController {
                 return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
             }
 
-            const emailCheck = await UserModel.findUserByEmail(data.email);
-            if (emailCheck && emailCheck.id.toString() !== id) {
-                return res.status(400).json({ success: false, message: 'Email sudah digunakan oleh user lain', errors: { email: 'Email sudah digunakan' } });
+            // Cek email duplikat jika email diubah
+            if (data.email) {
+                const emailCheck = await UserModel.findUserByEmail(data.email);
+                if (emailCheck && emailCheck.id.toString() !== id) {
+                    return res.status(400).json({ success: false, message: 'Email sudah digunakan oleh user lain', errors: { email: 'Email sudah digunakan' } });
+                }
+            }
+
+            // Cek username duplikat jika username diubah
+            if (data.username) {
+                const usernameCheck = await UserModel.findUserByUsername(data.username);
+                if (usernameCheck && usernameCheck.id.toString() !== id) {
+                    return res.status(400).json({ success: false, message: 'Username sudah digunakan oleh user lain', errors: { username: 'Username sudah digunakan' } });
+                }
             }
 
             await UserModel.updateUser(id, data);
-            
+
             const updatedUser = await UserModel.findUserById(id);
 
             res.json({ success: true, message: 'User berhasil diupdate', user: updatedUser });
@@ -184,13 +206,13 @@ class UserController {
         try {
             const { id } = req.params;
             const { new_password } = req.body;
-            
+
             if (!new_password || new_password.length < 6) {
                 return res.status(400).json({ success: false, message: 'Password baru minimal 6 karakter' });
             }
 
             const user = await UserModel.findUserById(id);
-            
+
             if (!user) {
                 return res.status(404).json({ success: false, message: 'User tidak ditemukan' });
             }
@@ -208,19 +230,19 @@ class UserController {
 
     async bulkCreatePengurus(req, res) {
         let filePath = null;
-        
+
         try {
             if (!req.file) {
                 return res.status(400).json({ success: false, message: 'File tidak ditemukan' });
             }
 
             filePath = req.file.path;
-            
+
             // 1. Parse File
             let jsonData;
             try {
                 // Menggunakan helper dari Utils
-                jsonData = parseUploadedFile(filePath, req.file.originalname); 
+                jsonData = parseUploadedFile(filePath, req.file.originalname);
             } catch (e) {
                 cleanupFile(filePath);
                 return res.status(400).json({ success: false, message: e.message });
@@ -240,7 +262,7 @@ class UserController {
             // ... (Loop dan Logika Sisanya) ...
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
-                const rowNumber = i + 2; 
+                const rowNumber = i + 2;
 
                 try {
                     const data = {
@@ -258,7 +280,7 @@ class UserController {
                         errors.push(`Baris ${rowNumber}: ${Object.values(rowErrors).join(', ')}`);
                         continue;
                     }
-                    
+
                     if (processedUsernames.has(data.username) || await UserModel.findUserByUsername(data.username)) {
                         errors.push(`Baris ${rowNumber}: Username ${data.username} sudah digunakan`);
                         continue;
@@ -267,10 +289,10 @@ class UserController {
                         errors.push(`Baris ${rowNumber}: Email ${data.email} sudah digunakan`);
                         continue;
                     }
-                    
+
                     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
                     const insertId = await UserModel.createUser(data, hashedPassword); // Menggunakan UserModel
-                    
+
                     results.push({ id: insertId, ...data, password: undefined });
                     processedUsernames.add(data.username);
                     processedEmails.add(data.email);
@@ -280,8 +302,8 @@ class UserController {
                     errors.push(`Baris ${rowNumber}: Error tidak terduga: ${error.message}`);
                 }
             }
-            
-            
+
+
             // 3. Final Response
             res.status(201).json({
                 success: true,

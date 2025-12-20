@@ -1,6 +1,6 @@
 // models/userModel.js (VERSI BERSIH, HAPUS DUPLIKASI)
 
-const db = require('../db'); 
+const db = require('../db');
 
 const UserModel = {
     // ----------------------------------------------------------------------
@@ -36,13 +36,13 @@ const UserModel = {
     // ----------------------------------------------------------------------
     // --- DATA MASTER & LAPORAN ---
     // ----------------------------------------------------------------------
-    
-    getAllUsers: async () => { 
+
+    getAllUsers: async () => {
         const [rows] = await db.execute('SELECT id, username, email, nama_lengkap, jabatan, divisi FROM users WHERE role = "user"');
         return rows;
     },
 
-    getAllUsersComplete: async () => { 
+    getAllUsersComplete: async () => {
         const [rows] = await db.execute(`
             SELECT id, nama_lengkap, username, email, jabatan, role, divisi
             FROM users 
@@ -50,13 +50,13 @@ const UserModel = {
         `);
         return rows;
     },
-    
+
     findUserById: async (userId) => {
         const [rows] = await db.execute('SELECT id, nama_lengkap, username, email, jabatan, role, divisi FROM users WHERE id = ?', [userId]);
         return rows[0] || null;
     },
 
-    countAdmins: async () => { 
+    countAdmins: async () => {
         const [rows] = await db.execute('SELECT COUNT(*) as count FROM users WHERE role = "admin"');
         return rows[0].count;
     },
@@ -73,18 +73,51 @@ const UserModel = {
         return result.insertId;
     },
 
-    updateUser: async (id, data) => { 
-        await db.execute(
-            'UPDATE users SET nama_lengkap = ?, email = ?, jabatan = ?, role = ?, divisi = ? WHERE id = ?',
-            [data.nama_lengkap, data.email, data.jabatan, data.role, data.divisi, id]
-        );
+    updateUser: async (id, data) => {
+        // Build dynamic query - hanya update field yang ada
+        const fields = [];
+        const values = [];
+
+        if (data.nama_lengkap !== undefined) {
+            fields.push('nama_lengkap = ?');
+            values.push(data.nama_lengkap);
+        }
+        if (data.username !== undefined) {
+            fields.push('username = ?');
+            values.push(data.username);
+        }
+        if (data.email !== undefined) {
+            fields.push('email = ?');
+            values.push(data.email);
+        }
+        if (data.jabatan !== undefined) {
+            fields.push('jabatan = ?');
+            values.push(data.jabatan || null);
+        }
+        if (data.divisi !== undefined) {
+            fields.push('divisi = ?');
+            values.push(data.divisi || null);
+        }
+        if (data.role !== undefined) {
+            fields.push('role = ?');
+            values.push(data.role);
+        }
+
+        if (fields.length === 0) {
+            return; // Tidak ada yang diupdate
+        }
+
+        values.push(id); // Tambahkan id untuk WHERE clause
+
+        const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+        await db.execute(query, values);
     },
 
     updateProfile: async (namaLengkap, email, userId) => {
         await db.query('UPDATE users SET nama_lengkap = ?, email = ? WHERE id = ?', [namaLengkap, email, userId]);
     },
 
-    updatePassword: async (id, hashedPassword) => { 
+    updatePassword: async (id, hashedPassword) => {
         await db.execute('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
     },
 
@@ -99,7 +132,7 @@ const UserModel = {
         await db.query('UPDATE users SET resetToken = ?, resetTokenExpiry = ? WHERE id = ?', [resetToken, resetTokenExpiry, userId]);
     },
 
-    deleteUser: async (id) => { 
+    deleteUser: async (id) => {
         const [result] = await db.execute('DELETE FROM users WHERE id = ?', [id]);
         return result.affectedRows;
     },
@@ -110,7 +143,7 @@ const UserModel = {
     },
 
     // Digunakan oleh generateJadwalPiket
-    getAllPengurus: async () => { 
+    getAllPengurus: async () => {
         // Filter user dengan role yang relevan untuk piket (asumsi admin/user)
         const [rows] = await db.execute('SELECT id, nama_lengkap FROM users WHERE role IN ("admin", "user") ORDER BY nama_lengkap');
         return rows;

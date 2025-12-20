@@ -1,70 +1,236 @@
-# Getting Started with Create React App
+# 📋 Sistem Informasi Piket & Inventaris
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Sistem manajemen piket dan inventaris berbasis web untuk organisasi/institusi.
 
-## Available Scripts
+## 🚀 Quick Start
 
-In the project directory, you can run:
+### Prerequisites
+- Node.js (v14 atau lebih tinggi)
+- MySQL Database
+- npm atau yarn
 
-### `npm start`
+### Installation
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```bash
+# Clone repository
+git clone <repository-url>
+cd project-ppsi
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+# Install dependencies - Frontend
+cd Frontend
+npm install
 
-### `npm test`
+# Install dependencies - Backend
+cd ../backend
+npm install
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+# Setup database
+# Import database schema dari backend/database/schema.sql
 
-### `npm run build`
+# Configure environment
+# Copy .env.example to .env dan sesuaikan konfigurasi
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Running the Application
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+```bash
+# Terminal 1 - Backend
+cd backend
+npm run dev
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+# Terminal 2 - Frontend
+cd Frontend
+npm run dev
+```
 
-### `npm run eject`
+Aplikasi akan berjalan di:
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5000
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 📚 Dokumentasi
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### User Documentation
+- [Panduan Export PDF](docs/user/PANDUAN_EXPORT_PDF.md)
+- [Quick Start Export](docs/user/QUICK_START_EXPORT.md)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+### Developer Documentation
+- [Implementation Guide](docs/developer/IMPLEMENTATION_GUIDE.md)
+- [System Audit & Improvements](docs/developer/SYSTEM_AUDIT_IMPROVEMENTS.md)
+- [Responsive Improvements](docs/developer/RESPONSIVE_IMPROVEMENTS.md)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Design Documentation
+- [Export PDF Premium](docs/design/EXPORT_PDF_PREMIUM.md)
+- [Export Style Guide](docs/design/EXPORT_STYLE_GUIDE.md)
 
-## Learn More
+## 🎯 Fitur Utama
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### Untuk User
+- ✅ Absensi dengan GPS & Foto
+- ✅ Checklist Inventaris Harian
+- ✅ Lihat Jadwal Piket
+- ✅ Informasi & Pengumuman
+- ✅ Riwayat Absensi
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Untuk Admin
+- ✅ User Management
+- ✅ Master Data Inventaris
+- ✅ Jadwal Piket Management
+- ✅ Laporan Absensi & Inventaris
+- ✅ Export PDF Professional
+- ✅ Information Management
 
-### Code Splitting
+## 🛠️ Tech Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Frontend
+- React.js
+- Tailwind CSS
+- Framer Motion
+- jsPDF & jsPDF-AutoTable
+- React Router
+- Axios
 
-### Analyzing the Bundle Size
+### Backend
+- Node.js
+- Express.js
+- MySQL
+- JWT Authentication
+- Multer (File Upload)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+## 📱 Responsive Design
 
-### Making a Progressive Web App
+Aplikasi fully responsive untuk:
+- 📱 Mobile (< 640px)
+- 📱 Tablet (640px - 1024px)
+- 💻 Desktop (> 1024px)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 🔐 Authentication
 
-### Advanced Configuration
+Sistem menggunakan JWT (JSON Web Token) untuk autentikasi:
+- Token disimpan di localStorage
+- Auto logout saat token expired
+- Protected routes untuk admin & user
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+## 📊 Database Schema
 
-### Deployment
+```
+users
+├── id
+├── username
+├── password
+├── nama_lengkap
+├── email
+├── no_pengurus
+├── jabatan
+├── divisi
+└── role
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+absensi
+├── id
+├── user_id
+├── tanggal
+├── waktu_masuk
+├── waktu_keluar
+├── foto_masuk
+├── foto_keluar
+├── latitude
+├── longitude
+└── status
 
-### `npm run build` fails to minify
+inventaris
+├── id
+├── kode_barang
+├── nama_barang
+├── jumlah
+├── kondisi
+└── kategori
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+jadwal_piket
+├── id
+├── user_id
+├── hari
+└── created_at
+
+informasi
+├── id
+├── judul
+├── konten
+├── tanggal
+└── created_by
+```
+
+## 🎨 Features Highlights
+
+### Export PDF Professional
+- Corporate/Formal style
+- Landscape untuk Absensi
+- Portrait untuk Inventaris
+- Statistik ringkasan
+- Tanda tangan area
+- Multi-page support
+
+### Responsive Design
+- Mobile-first approach
+- Touch-friendly interface
+- Adaptive layouts
+- Optimized for all devices
+
+### User Experience
+- Loading states
+- Error handling
+- Toast notifications
+- Form validation
+- Empty states
+
+## 🔄 Recent Updates
+
+### v2.0.0 (Latest)
+- ✅ Enhanced API utility dengan interceptors
+- ✅ Error boundary untuk error handling
+- ✅ Loading components (overlay, skeleton, spinner)
+- ✅ Responsive improvements untuk mobile
+- ✅ Professional PDF export dengan corporate style
+- ✅ Form validation dengan react-hook-form
+- ✅ Toast notifications dengan react-hot-toast
+
+### v1.0.0
+- ✅ Basic CRUD operations
+- ✅ Authentication & Authorization
+- ✅ Absensi dengan GPS & Foto
+- ✅ Inventaris management
+- ✅ Jadwal piket
+- ✅ Laporan & Export
+
+## 🤝 Contributing
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 👥 Team
+
+- Developer: [Your Name]
+- Designer: [Designer Name]
+- Project Manager: [PM Name]
+
+## 📞 Support
+
+Untuk bantuan dan pertanyaan:
+- Email: support@example.com
+- Issues: [GitHub Issues](https://github.com/yourusername/project-ppsi/issues)
+
+## 🙏 Acknowledgments
+
+- React.js Team
+- Tailwind CSS Team
+- jsPDF Contributors
+- All open source contributors
+
+---
+
+**Made with ❤️ for better organization management**

@@ -1,357 +1,388 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import api from '../api/axios';
-import { CheckCircle, Clock, RefreshCw, LogOut, Camera, AlertTriangle } from 'lucide-react';
-import AbsensiKamera from './AbsensiKamera';
-import JadwalPiket from './JadwalPiket';
-import ProfilSingkat from './ProfilSingkat';
-import { isObject } from "framer-motion";
+// src/user/DashboardUser.jsx
+import React, { useState, useEffect } from "react";
+import Navbar from "../components/Navbar";
+import JadwalPiket from "./JadwalPiket";
+import AbsensiKamera from "./AbsensiKamera";
+import UserProfileModal from "./UserProfileModal";
+import api, { BASE_URL } from "../api/axios";
+import { jwtDecode } from "jwt-decode";
+import {
+    Megaphone,
+    CalendarCheck,
+    AlertCircle,
+    Video,
+    LogOut,
+    UserCheck,
+    Clock
+} from "lucide-react";
+import { motion } from "framer-motion";
 
-// Komponen Checklist Inventaris
-const InventarisChecklist = ({ sesiAbsen, setSesiAbsen, onChecklistSubmit }) => {
-    const [isLoading, setIsLoading] = useState(false);
-    
-    if (!sesiAbsen || !sesiAbsen.inventaris_checklist) {
-        return (
-            <div className="p-6 border-2 border-black rounded-xl bg-white shadow-lg">
-                <p>Memuat checklist...</p>
-            </div>
-        );
-    }
-    
-    let checklist;
-    try { 
-        checklist = JSON.parse(sesiAbsen.inventaris_checklist); 
-    } catch (e) { 
-        return <p>Error memuat checklist.</p>; 
-    }
-
-    const isSubmitted = sesiAbsen.checklist_submitted;
-    const statusOptions = ["Tersedia", "Habis", "Dipinjam", "Rusak", "Hilang"];
-    const totalItems = checklist.length;
-    const checkedItems = checklist.filter(item => item.status).length;
-    const allChecked = checkedItems === totalItems;
-
-    const handleStatusChange = (index, newStatus) => {
-        if (isSubmitted) return;
-        const updated = [...checklist];
-        updated[index].status = newStatus;
-        setSesiAbsen({ ...sesiAbsen, inventaris_checklist: JSON.stringify(updated) });
-    };
-
-    const handleSubmitChecklist = async () => {
-        if (!allChecked) {
-            alert(`Mohon lengkapi semua item checklist (${checkedItems}/${totalItems})`);
-            return;
-        }
-        
-        setIsLoading(true);
-        try {
-            const response = await api.post("/absensi/submit-checklist", 
-                { absensiId: sesiAbsen.id, checklist: checklist },
-                { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
-            );
-            onChecklistSubmit(response.data.message);
-        } catch (error) { 
-            alert("Gagal mengirim checklist."); 
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    return (
-        <div className="p-6 border-2 border-black rounded-xl bg-white shadow-lg">
-            <div className="flex items-center justify-between mb-5">
-                <h3 className="text-xl font-bold text-gray-800">Laporan Cek Inventaris</h3>
-                {isSubmitted ? (
-                    <span className="flex items-center gap-1.5 text-green-600 font-semibold text-sm bg-green-50 px-3 py-1.5 rounded-lg border border-green-200">
-                        <CheckCircle size={16} /> Terkirim
-                    </span>
-                ) : (
-                    <span className="text-sm font-medium text-gray-500">
-                        {checkedItems}/{totalItems}
-                    </span>
-                )}
-            </div>
-
-            <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                {checklist.map((item, index) => (
-                    <div key={index} className="p-4 border-2 border-gray-200 rounded-lg bg-gray-50 hover:border-pink-300 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="font-semibold text-gray-800">{item.nama}</p>
-                            {item.status && <CheckCircle size={18} className="text-green-600" />}
-                        </div>
-                        <select
-                            value={item.status || ""}
-                            onChange={(e) => handleStatusChange(index, e.target.value)}
-                            disabled={isSubmitted}
-                            className="w-full p-2.5 border-2 border-black rounded-lg bg-white disabled:bg-gray-200 font-medium text-sm focus:outline-none focus:border-pink-500"
-                        >
-                            <option value="" disabled>Pilih Status</option>
-                            {statusOptions.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
-                    </div>
-                ))}
-            </div>
-
-            <button
-                onClick={handleSubmitChecklist}
-                disabled={isSubmitted || isLoading || !allChecked}
-                className="w-full mt-6 py-3.5 bg-pink-500 text-white font-bold rounded-lg border-2 border-black hover:bg-pink-600 disabled:bg-gray-400 disabled:border-gray-400 transition-all"
-            >
-                {isLoading ? 'Mengirim...' : (isSubmitted ? "Laporan Terkirim" : "Kirim Laporan Inventaris")}
-            </button>
-        </div>
-    );
-};
-
-
-// Komponen Dashboard Utama
 const DashboardUser = () => {
-    const [userInfo, setUserInfo] = useState({ name: '', role: '', avatar_url: ''});
-    const [sesiAbsen, setSesiAbsen] = useState(null);
-    const [showAbsenModal, setShowAbsenModal] = useState(false);
-    const [modeAbsen, setModeAbsen] = useState('masuk');
+    const [userData, setUserData] = useState({ nama_lengkap: "User" });
+    const [loading, setLoading] = useState(true);
+
+    // State Pengumuman
+    const [informasiList, setInformasiList] = useState([]);
+
+    // State Absensi
+    const [absenStatus, setAbsenStatus] = useState(null); // 'belum', 'sedang', 'sudah'
+    const [absensiId, setAbsensiId] = useState(null); // ID untuk absen keluar
+    const [showCamera, setShowCamera] = useState(false);
+    const [cameraMode, setCameraMode] = useState('masuk'); // 'masuk' or 'keluar'
+    const [isPiketToday, setIsPiketToday] = useState(false);
+
+    // State Modal
+    const [showProfileModal, setShowProfileModal] = useState(false);
     const [pesanDashboard, setPesanDashboard] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
-    const navigate = useNavigate();
 
-    const getInitialData = async () => {
+    // Load User Data
+    const fetchUserData = async () => {
         const token = localStorage.getItem("token");
-        if (!token) { navigate('/login'); return; }
-        
-        setIsLoading(true);
-        const headers = { 'Authorization': `Bearer ${token}` };
-        
-        try {
-            const [profileRes, statusRes] = await Promise.all([
-                api.get('/profile', { headers }),
-                api.get('/absensi/status', { headers })
-            ]);
-            setUserInfo({ 
-                name: profileRes.data.nama_lengkap, 
-                role: profileRes.data.jabatan,
-                division:profileRes.data.divisi,
-                avatar_url: profileRes.data.avatar_url 
-            });
-            setSesiAbsen(statusRes.data);
-        } catch (error) {
-            console.error('Error loading data:', error);
-            if (error.response?.status === 401) {
-                localStorage.removeItem("token");
-                navigate('/login');
+        if (token) {
+            try {
+                const decoded = jwtDecode(token);
+                // Init from token first
+                setUserData(prev => ({ ...prev, ...decoded }));
+
+                // Fetch full profile (including avatar)
+                try {
+                    const profileRes = await api.get('/profile');
+                    if (profileRes.data) {
+                        setUserData(prev => ({ ...prev, ...profileRes.data }));
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch profile:", err);
+                }
+
+                fetchDashboardData(decoded.id);
+            } catch (error) {
+                console.error("Token invalid:", error);
             }
+        }
+    };
+
+    useEffect(() => {
+        fetchUserData();
+    }, []);
+
+    const fetchDashboardData = async (userId) => {
+        setLoading(true);
+        try {
+            // 1. Fetch Semua Informasi (SOP, Panduan, Lainnya)
+            const infoRes = await api.get('/informasi');
+            if (infoRes.data && infoRes.data.data) {
+                const data = infoRes.data.data;
+                setInformasiList(Array.isArray(data) ? data : [data]);
+            } else {
+                setInformasiList([]);
+            }
+
+            // 2. Fetch Status Piket Hari Ini
+            const jadwalRes = await api.get('/jadwal/hari-ini');
+
+            if (jadwalRes.data.success && jadwalRes.data.data) {
+                const todaySchedule = jadwalRes.data.data;
+                const mySchedule = todaySchedule.pengurus.find(p =>
+                    (p.user_id == userId) || (p.id == userId)
+                );
+
+                if (mySchedule) {
+                    setIsPiketToday(true);
+                    setAbsenStatus(mySchedule.status);
+                    if (mySchedule.absensi_id) {
+                        setAbsensiId(mySchedule.absensi_id);
+                    }
+                } else {
+                    setIsPiketToday(false);
+                }
+            }
+        } catch (error) {
+            console.error("Error loading dashboard:", error);
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
-    useEffect(() => { getInitialData(); }, []);
-
-    const handleOpenAbsen = (mode) => {
-        setModeAbsen(mode);
-        setShowAbsenModal(true);
+    const handleAbsenClick = (mode) => {
+        setCameraMode(mode);
+        setShowCamera(true);
     };
 
-    const handleLogout = () => {
-        if (window.confirm('Apakah Anda yakin ingin keluar?')) {
-            localStorage.removeItem("token");
-            navigate('/login');
+    const handleAbsensiSuccess = () => {
+        if (userData.id) fetchDashboardData(userData.id);
+        setShowCamera(false);
+    };
+
+    const handleProfileUpdate = () => {
+        fetchUserData();
+    };
+
+    useEffect(() => {
+        if (pesanDashboard) {
+            const timer = setTimeout(() => setPesanDashboard(""), 5000);
+            return () => clearTimeout(timer);
         }
-    };
-
-    const { isDurasiCukup, durasiMenit, sisaMenit } = useMemo(() => {
-        if (!sesiAbsen?.waktu_masuk) return { isDurasiCukup: false, durasiMenit: 0, sisaMenit: 0 };
-        const durasiMs = new Date() - new Date(sesiAbsen.waktu_masuk);
-        const durasiMenit = durasiMs / (1000 * 60);
-        const sisaMenit = Math.max(0, Math.ceil(120 - durasiMenit));
-        return { 
-            isDurasiCukup: durasiMenit >= 120, 
-            durasiMenit,
-            sisaMenit
-        };
-    }, [sesiAbsen]);
-
-    if (isLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-50">
-                <RefreshCw className="animate-spin h-12 w-12 text-pink-500" />
-            </div>
-        );
-    }
-
-    const canAbsenKeluar = sesiAbsen?.checklist_submitted && isDurasiCukup;
+    }, [pesanDashboard]);
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <div className="max-w-7xl mx-auto p-6 lg:p-8">
-                {/* Header dengan Logout */}
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-800">Dashboard Piket</h1>
-                        <p className="text-gray-600 mt-1">Selamat datang, {userInfo.name}</p>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        className="px-6 py-2.5 bg-gray-700 text-white font-semibold rounded-lg border-2 border-black hover:bg-gray-800 transition-all flex items-center gap-2 shadow-lg"
-                    >
-                        <LogOut size={18} />
-                        Logout
-                    </button>
-                </div>
+        <div className="min-h-screen bg-gray-50 flex flex-col font-sans overflow-hidden">
+            <Navbar />
 
-                {pesanDashboard && (
-                    <div className="mb-6 p-4 text-center font-bold bg-green-100 text-green-800 rounded-xl border-2 border-green-300 shadow-lg">
-                        {pesanDashboard}
-                    </div>
-                )}
-                
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    {/* === KOLOM UTAMA === */}
-                    <div className="lg:col-span-8 space-y-8">
-                        {!sesiAbsen ? (
-                            <div className="p-10 border-2 border-black rounded-xl bg-gradient-to-br from-white to-gray-50 shadow-xl">
-                                <div className="max-w-md mx-auto text-center">
-                                    <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-6 border-2 border-black">
-                                        <Camera size={40} className="text-pink-600" />
-                                    </div>
-                                    <h2 className="text-3xl font-bold text-gray-800 mb-3">Mulai Sesi Piket</h2>
-                                    <p className="text-gray-600 mb-8 text-lg">
-                                        Anda belum memulai sesi piket hari ini. <br/>
-                                        Ambil foto absen untuk memulai.
-                                    </p>
-                                    <button 
-                                        onClick={() => handleOpenAbsen('masuk')} 
-                                        className="px-10 py-4 bg-green-500 text-white font-bold text-lg rounded-xl shadow-lg hover:bg-green-600 transition-all border-2 border-black inline-flex items-center gap-3"
-                                    >
-                                        <Camera size={24} />
-                                        Ambil Absen Masuk
-                                    </button>
+            <main className="flex-1 overflow-y-auto p-6">
+                <div className="max-w-[1600px] mx-auto">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <div className="flex items-center gap-4 group cursor-pointer" onClick={() => setShowProfileModal(true)} title="Klik untuk edit profil">
+                            {/* Avatar */}
+                            <div className="w-16 h-16 rounded-full border-2 border-black overflow-hidden bg-white shadow-sm shrink-0 transition-transform group-hover:scale-105 relative">
+                                {userData.avatar_url ? (
+                                    <img
+                                        src={userData.avatar_url}
+                                        alt="Profile"
+                                        className="w-full h-full object-cover"
+                                        onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }}
+                                    />
+                                ) : null}
+                                <div className={`w-full h-full flex items-center justify-center bg-pink-100 text-pink-600 font-bold text-2xl ${userData.avatar_url ? 'hidden' : 'flex'}`}>
+                                    {userData.nama_lengkap ? userData.nama_lengkap.charAt(0).toUpperCase() : 'U'}
+                                </div>
+
+                                {/* Overlay Edit Hint */}
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                    <span className="text-white text-xs font-bold">Edit</span>
                                 </div>
                             </div>
-                        ) : (
-                            <>
-                                {/* Status Piket Card dengan Layout Horizontal */}
-                                <div className="p-6 border-2 border-black rounded-xl bg-pink-50 shadow-lg">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex gap-4">
-                                            <div className="w-16 h-16 bg-pink-500 rounded-xl flex items-center justify-center border-2 border-black flex-shrink-0">
-                                                <Clock size={32} className="text-white" />
+
+                            <div>
+                                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 group-hover:text-pink-700 transition-colors">
+                                    Halo, <span className="text-pink-600 capitalize">{userData.nama_lengkap}</span> 👋
+                                </h1>
+                                <p className="text-gray-500 mt-1 font-medium">Selamat datang di Panel Piket BESTI</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Alert Message */}
+                    {pesanDashboard && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mb-6 p-4 bg-green-100 text-green-800 rounded-xl border-2 border-black shadow-sm flex items-center gap-3"
+                        >
+                            <UserCheck size={24} />
+                            <span className="font-bold">{pesanDashboard}</span>
+                        </motion.div>
+                    )}
+
+                    {/* Grid Layout */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 h-full">
+
+                        {/* COLUMN 1: Status Piket (Absensi) */}
+                        <div className="bg-white rounded-xl shadow-sm border-2 border-black overflow-hidden flex flex-col h-full lg:h-[600px]">
+                            <div className="bg-pink-100 p-4 border-b-2 border-black flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="bg-pink-500 p-1.5 rounded border-2 border-black text-white">
+                                        <Clock size={16} strokeWidth={3} />
+                                    </div>
+                                    <h2 className="font-bold text-lg text-gray-900">Status Tugas</h2>
+                                </div>
+                                {isPiketToday && (
+                                    <span className="text-xs font-black bg-yellow-300 px-2 py-1 border-2 border-black rounded shadow-sm">
+                                        HARI INI
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="p-6 text-center flex-1 flex flex-col justify-center items-center overflow-y-auto">
+                                {loading ? (
+                                    <div className="animate-pulse flex flex-col items-center w-full">
+                                        <div className="h-20 w-20 bg-gray-200 rounded-full mb-4"></div>
+                                        <div className="h-4 w-32 bg-gray-200 rounded"></div>
+                                    </div>
+                                ) : isPiketToday ? (
+                                    <div className="space-y-6 w-full">
+                                        <div className="inline-block relative">
+                                            {absenStatus === 'belum' && (
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-24 h-24 bg-gray-100 rounded-full border-2 border-black flex items-center justify-center mb-3">
+                                                        <Clock size={40} className="text-gray-400" />
+                                                    </div>
+                                                    <span className="px-4 py-2 bg-gray-100 border-2 border-black rounded-lg font-bold text-gray-600">
+                                                        Belum Absen
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {absenStatus === 'sedang' && (
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-24 h-24 bg-yellow-100 rounded-full border-2 border-black flex items-center justify-center mb-3 animate-pulse">
+                                                        <Clock size={40} className="text-yellow-600" />
+                                                    </div>
+                                                    <span className="px-4 py-2 bg-yellow-100 border-2 border-black rounded-lg font-bold text-yellow-700">
+                                                        Sedang Bertugas
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {absenStatus === 'sudah' && (
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-24 h-24 bg-green-100 rounded-full border-2 border-black flex items-center justify-center mb-3">
+                                                        <UserCheck size={40} className="text-green-600" />
+                                                    </div>
+                                                    <span className="px-4 py-2 bg-green-100 border-2 border-black rounded-lg font-bold text-green-700">
+                                                        Selesai Bertugas
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {absenStatus === 'belum' && (
+                                            <button
+                                                onClick={() => handleAbsenClick('masuk')}
+                                                className="w-full py-4 bg-green-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Video size={24} /> ABSEN MASUK
+                                            </button>
+                                        )}
+
+                                        {absenStatus === 'sedang' && (
+                                            <button
+                                                onClick={() => handleAbsenClick('keluar')}
+                                                className="w-full py-4 bg-red-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <LogOut size={24} /> ABSEN KELUAR
+                                            </button>
+                                        )}
+
+                                        {absenStatus === 'sudah' && (
+                                            <div className="p-4 bg-green-50 rounded-xl border-2 border-black border-dashed w-full">
+                                                <p className="text-sm font-bold text-green-800">Laporan piket telah tersimpan.</p>
+                                                <p className="text-xs text-green-600 mt-1">Terima kasih atas kontribusi Anda hari ini!</p>
                                             </div>
-                                            <div>
-                                                <h2 className="text-2xl font-bold text-gray-800 mb-1">Sedang Piket</h2>
-                                                <div className="space-y-1 text-gray-700">
-                                                    <p className="text-sm">
-                                                        Masuk: <span className="font-semibold">
-                                                            {new Date(sesiAbsen.waktu_masuk).toLocaleTimeString('id-ID')}
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="py-6 flex flex-col items-center">
+                                        <div className="bg-gray-50 w-32 h-32 rounded-full border-2 border-black flex items-center justify-center mb-6 border-dashed">
+                                            <CalendarCheck size={48} className="text-gray-400" />
+                                        </div>
+                                        <p className="text-gray-800 font-bold text-xl">Bebas Tugas!</p>
+                                        <p className="text-gray-500 text-sm mt-2 max-w-[200px]">Hari ini kamu tidak ada jadwal piket. Nikmati harimu!</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* COLUMN 2: Jadwal Piket Hari Ini */}
+                        <div className="bg-white rounded-xl shadow-sm border-2 border-black overflow-hidden h-full lg:h-[600px] flex flex-col">
+                            <div className="bg-blue-100 p-4 border-b-2 border-black flex items-center gap-2 shrink-0">
+                                <div className="bg-blue-500 p-1.5 rounded border-2 border-black text-white">
+                                    <CalendarCheck size={16} strokeWidth={3} />
+                                </div>
+                                <h2 className="font-bold text-lg text-gray-900">Jadwal Hari Ini</h2>
+                            </div>
+                            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
+                                <JadwalPiket />
+                            </div>
+                        </div>
+
+                        {/* COLUMN 3: Informasi */}
+                        <div className="bg-white rounded-xl shadow-sm border-2 border-black overflow-hidden h-full lg:h-[600px] flex flex-col">
+                            <div className="bg-yellow-100 p-4 border-b-2 border-black flex items-center gap-2 shrink-0">
+                                <div className="bg-yellow-500 p-1.5 rounded border-2 border-black text-white">
+                                    <Megaphone size={16} strokeWidth={3} />
+                                </div>
+                                <h2 className="font-bold text-lg text-gray-900">Papan Pengumuman</h2>
+                            </div>
+
+                            <div className="p-6 flex-1 overflow-y-auto custom-scrollbar relative">
+                                {informasiList.length === 0 ? (
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-gray-400">
+                                        <div className="bg-gray-50 p-4 rounded-full border-2 border-dashed border-gray-300 mb-3">
+                                            <AlertCircle size={32} className="opacity-50" />
+                                        </div>
+                                        <p className="font-medium">Tidak ada informasi baru</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {informasiList.map((info) => (
+                                            <div key={info.id} className="group relative bg-white border-2 border-black rounded-xl p-5 hover:bg-yellow-50 transition-colors shadow-sm hover:shadow-md border-b-4 border-r-4 border-black">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <h3 className="font-black text-gray-900 text-lg leading-tight">
+                                                            {info.judul}
+                                                        </h3>
+                                                        <span className="text-[10px] bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded border border-black mt-2 inline-block font-bold uppercase tracking-wider">
+                                                            {info.kategori}
                                                         </span>
-                                                    </p>
-                                                    <p className="text-sm">
-                                                        Durasi: <span className="font-semibold">
-                                                            {Math.floor(durasiMenit / 60)} jam {Math.floor(durasiMenit % 60)} menit
-                                                        </span>
-                                                    </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-gray-700 text-sm font-medium mb-4 whitespace-pre-wrap leading-relaxed">
+                                                    {info.isi}
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-2">
+                                                    <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1">
+                                                        <Clock size={10} />
+                                                        {new Date(info.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                    </span>
+
+                                                    {info.file_path && (
+                                                        <a
+                                                            href={`${BASE_URL}/${info.file_path}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                                                        >
+                                                            <div className="bg-blue-100 p-1 rounded-sm border border-black">
+                                                                <Megaphone size={10} />
+                                                            </div>
+                                                            Unduh
+                                                        </a>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                </div>
-                                
-                                {/* Checklist */}
-                                <InventarisChecklist 
-                                    sesiAbsen={sesiAbsen} 
-                                    setSesiAbsen={setSesiAbsen}
-                                    onChecklistSubmit={(message) => {
-                                        setPesanDashboard(message);
-                                        getInitialData();
-                                    }}
-                                />
-                            </>
-                        )}
-                    </div>
-
-                    {/* === SIDEBAR === */}
-                    <div className="lg:col-span-4 space-y-8">
-                        <ProfilSingkat user={userInfo} onProfileUpdate={getInitialData} />
-                        <JadwalPiket />
-                        
-                        {sesiAbsen && (
-                            <div className="p-6 border-2 border-black rounded-xl bg-white shadow-lg">
-                                <h3 className="font-bold text-xl mb-5 text-gray-800">Persyaratan Absen Keluar</h3>
-                                
-                                <div className="space-y-3 mb-6">
-                                    <div className={`p-4 rounded-lg border-2 ${
-                                        sesiAbsen.checklist_submitted 
-                                            ? 'bg-green-50 border-green-400' 
-                                            : 'bg-yellow-50 border-yellow-400'
-                                    }`}>
-                                        <div className="flex items-center gap-3">
-                                            {sesiAbsen.checklist_submitted ? (
-                                                <CheckCircle className="text-green-600 flex-shrink-0" size={24}/>
-                                            ) : (
-                                                <AlertTriangle className="text-yellow-600 flex-shrink-0" size={24}/>
-                                            )}
-                                            <div>
-                                                <span className="font-semibold text-gray-800 block">Laporan Inventaris</span>
-                                                <span className={`text-sm ${
-                                                    sesiAbsen.checklist_submitted ? 'text-green-700' : 'text-yellow-700'
-                                                }`}>
-                                                    {sesiAbsen.checklist_submitted ? 'Selesai' : 'Belum selesai'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className={`p-4 rounded-lg border-2 ${
-                                        isDurasiCukup 
-                                            ? 'bg-green-50 border-green-400' 
-                                            : 'bg-yellow-50 border-yellow-400'
-                                    }`}>
-                                        <div className="flex items-center gap-3">
-                                            {isDurasiCukup ? (
-                                                <CheckCircle className="text-green-600 flex-shrink-0" size={24}/>
-                                            ) : (
-                                                <Clock className="text-yellow-600 flex-shrink-0" size={24}/>
-                                            )}
-                                            <div>
-                                                <span className="font-semibold text-gray-800 block">Durasi Piket</span>
-                                                <span className={`text-sm ${
-                                                    isDurasiCukup ? 'text-green-700' : 'text-yellow-700'
-                                                }`}>
-                                                    {isDurasiCukup ? 'Minimal 2 jam terpenuhi' : `${sisaMenit} menit lagi`}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <button
-                                    onClick={() => handleOpenAbsen("keluar")}
-                                    disabled={!canAbsenKeluar}
-                                    className="w-full py-4 bg-red-500 text-white font-bold text-lg rounded-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed hover:bg-red-600 transition-all border-2 border-black flex items-center justify-center gap-2"
-                                >
-                                    <Camera size={24} />
-                                    {canAbsenKeluar ? 'Ambil Absen Keluar' : 'Lengkapi Persyaratan'}
-                                </button>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
-            </div>
+            </main>
 
-            {showAbsenModal && (
+            {/* Modals */}
+            {showCamera && (
                 <AbsensiKamera
-                    mode={modeAbsen}
-                    absensiId={sesiAbsen?.id}
-                    onClose={() => { 
-                        setShowAbsenModal(false); 
-                        getInitialData(); 
-                    }}
+                    mode={cameraMode}
+                    absensiId={absensiId}
+                    onClose={() => setShowCamera(false)}
                     setPesanDashboard={setPesanDashboard}
+                    onSuccess={handleAbsensiSuccess}
                 />
             )}
+
+            {showProfileModal && (
+                <UserProfileModal
+                    userData={userData}
+                    onClose={() => setShowProfileModal(false)}
+                    onUpdate={handleProfileUpdate}
+                />
+            )}
+
+            <style jsx>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: #f1f1f1;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: #d1d5db;
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #9ca3af;
+                }
+            `}</style>
         </div>
     );
 };
