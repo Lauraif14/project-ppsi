@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const verifyToken = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
     if (!token) {
-        return res.status(403).send('Token diperlukan untuk otentikasi');
+        return res.status(403).json({ message: 'Token diperlukan untuk otentikasi' });
     }
 
     try {
@@ -11,7 +11,7 @@ const verifyToken = (req, res, next) => {
         req.user = decoded;
         next(); // Panggil next() jika token valid
     } catch (err) {
-        return res.status(401).send('Token tidak valid');
+        return res.status(401).json({ message: 'Token tidak valid' });
     }
 };
 

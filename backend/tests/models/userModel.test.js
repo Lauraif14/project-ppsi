@@ -1,11 +1,11 @@
 // tests/models/userModel.test.js (FINAL & 100% COVERAGE)
 
 // 1. Mock Database (MENGGANTIKAN KONEKSI DATABASE ASLI)
-const db = require('../../db'); 
+const db = require('../../db');
 
 // Mocks database module (agar tidak benar-benar terhubung ke DB)
 jest.mock('../../db', () => ({
-    query: jest.fn(), 
+    query: jest.fn(),
     execute: jest.fn(),
 }));
 
@@ -13,22 +13,22 @@ jest.mock('../../db', () => ({
 const UserModel = require('../../models/userModel');
 
 describe('UserModel', () => {
-    
+
     const mockQuery = db.query;
     const mockExecute = db.execute;
 
     beforeEach(() => {
         // Clear mock calls sebelum setiap test
-        mockQuery.mockClear(); 
+        mockQuery.mockClear();
         mockExecute.mockClear();
         // Default mock untuk find/select
-        mockQuery.mockResolvedValue([[]]); 
+        mockQuery.mockResolvedValue([[]]);
         mockExecute.mockResolvedValue([[]]);
     });
 
     // --- AUTENTIKASI & PENCARIAN ---
     describe('Authentication and Find Operations', () => {
-        
+
         test('findUserByIdentifier should call db.query with OR logic', async () => {
             const mockUser = { id: 1, username: 'test' };
             mockQuery.mockResolvedValue([[mockUser]]);
@@ -47,7 +47,7 @@ describe('UserModel', () => {
 
         test('findUserByResetToken should check both token and expiry', async () => {
             const mockToken = '123abc';
-            const mockExpiry = 1735689600000; 
+            const mockExpiry = 1735689600000;
             mockQuery.mockResolvedValue([[{ id: 10 }]]);
 
             await UserModel.findUserByResetToken(mockToken, mockExpiry);
@@ -73,7 +73,7 @@ describe('UserModel', () => {
             const result = await UserModel.findUserByEmail('notfound@test.com');
             expect(result).toBeNull();
         });
-        
+
         test('findUserByUsername should use db.execute', async () => {
             const mockRow = { id: 5 };
             mockExecute.mockResolvedValue([[mockRow]]);
@@ -88,7 +88,7 @@ describe('UserModel', () => {
             const result = await UserModel.findUserByUsername('notfound');
             expect(result).toBeNull();
         });
-        
+
         test('findUserByNamaLengkap should call db.query with correct WHERE clause', async () => {
             const mockRow = { id: 7, nama_lengkap: 'Ani' };
             mockQuery.mockResolvedValue([[mockRow]]);
@@ -99,7 +99,7 @@ describe('UserModel', () => {
             expect(mockQuery.mock.calls[0][0]).toBe('SELECT id, nama_lengkap FROM users WHERE nama_lengkap = ?');
             expect(result).toEqual(mockRow);
         });
-        
+
         test('findUserByNamaLengkap returns null if not found', async () => {
             mockQuery.mockResolvedValue([[]]);
             const result = await UserModel.findUserByNamaLengkap('NotFound');
@@ -126,7 +126,7 @@ describe('UserModel', () => {
 
     // --- DATA MASTER & LAPORAN ---
     describe('Data Master and Report Operations', () => {
-        
+
         test('getAllUsers should select non-admin users with specific fields', async () => {
             mockExecute.mockResolvedValue([[{ id: 1, username: 'user1' }]]);
 
@@ -139,7 +139,7 @@ describe('UserModel', () => {
             mockExecute.mockResolvedValue([[{ id: 1, username: 'user1' }]]);
             await UserModel.getAllUsersComplete();
             expect(mockExecute).toHaveBeenCalledTimes(1);
-            
+
             // FIX: Menggunakan RegEx fleksibel (\s+ untuk spasi/newline)
             expect(mockExecute.mock.calls[0][0]).toMatch(
                 /SELECT\s+id,\s+nama_lengkap,\s+username,\s+email,\s+jabatan,\s+role,\s+divisi\s+FROM users\s+ORDER BY id DESC/
@@ -153,13 +153,13 @@ describe('UserModel', () => {
             expect(mockExecute).toHaveBeenCalledTimes(1);
             expect(count).toBe(3);
         });
-        
+
         test('getAllPengurus should select ID and nama_lengkap for admin and user roles', async () => {
             const mockPengurusList = [{ id: 1, nama_lengkap: 'A' }, { id: 2, nama_lengkap: 'B' }];
             mockExecute.mockResolvedValue([mockPengurusList]);
 
             const result = await UserModel.getAllPengurus();
-            
+
             expect(mockExecute).toHaveBeenCalledTimes(1);
             expect(mockExecute.mock.calls[0][0]).toBe('SELECT id, nama_lengkap FROM users WHERE role IN ("admin", "user") ORDER BY nama_lengkap');
             expect(result).toEqual(mockPengurusList);
@@ -168,21 +168,21 @@ describe('UserModel', () => {
 
     // --- WRITE/UPDATE ---
     describe('Write and Update Operations', () => {
-        const MOCK_USER_DATA = { 
-            nama_lengkap: 'Budi Test', username: 'budi', email: 'budi@mail.com', 
+        const MOCK_USER_DATA = {
+            nama_lengkap: 'Budi Test', username: 'budi', email: 'budi@mail.com',
             jabatan: 'Staff', divisi: 'IT', role: 'user'
         };
         const MOCK_HASH = 'mockhashedpass';
 
         test('createUser should call db.execute with all required parameters and default role', async () => {
-            mockExecute.mockResolvedValue([{ insertId: 20 }]); 
+            mockExecute.mockResolvedValue([{ insertId: 20 }]);
             await UserModel.createUser(MOCK_USER_DATA, MOCK_HASH);
             expect(mockExecute).toHaveBeenCalledTimes(1);
             expect(mockExecute.mock.calls[0][1]).toEqual([
-                'Budi Test', 'budi', 'budi@mail.com', MOCK_HASH, 'Staff', 'IT', 'user' 
+                'Budi Test', 'budi', 'budi@mail.com', MOCK_HASH, 'Staff', 'IT', 'user'
             ]);
         });
-        
+
         test('createUser should apply default values for null/missing fields', async () => {
             mockExecute.mockResolvedValue([{ insertId: 21 }]);
             const minimalData = { nama_lengkap: 'Ani', username: 'aniuser', divisi: 'HR' };
@@ -196,14 +196,15 @@ describe('UserModel', () => {
 
         test('updateUser should correctly update specified fields', async () => {
             const dataToUpdate = {
-                nama_lengkap: 'Updated Name', email: 'upd@mail.com', 
+                nama_lengkap: 'Updated Name', email: 'upd@mail.com',
                 jabatan: 'Manager', role: 'admin', divisi: 'Finance'
             };
             mockExecute.mockResolvedValue([{}]);
 
             await UserModel.updateUser(5, dataToUpdate);
             expect(mockExecute).toHaveBeenCalledTimes(1);
-            expect(mockExecute.mock.calls[0][0]).toBe('UPDATE users SET nama_lengkap = ?, email = ?, jabatan = ?, role = ?, divisi = ? WHERE id = ?');
+            // Model builds query dynamically following if statement order: nama_lengkap, username, email, jabatan, divisi, role
+            expect(mockExecute.mock.calls[0][0]).toBe('UPDATE users SET nama_lengkap = ?, email = ?, jabatan = ?, divisi = ?, role = ? WHERE id = ?');
         });
 
         test('updateProfile should update nama_lengkap and email', async () => {
@@ -212,7 +213,7 @@ describe('UserModel', () => {
             expect(mockQuery).toHaveBeenCalledTimes(1);
             expect(mockQuery.mock.calls[0][0]).toBe('UPDATE users SET nama_lengkap = ?, email = ? WHERE id = ?');
         });
-        
+
         test('updatePassword should update password field', async () => {
             mockExecute.mockResolvedValue([{}]);
             await UserModel.updatePassword(1, 'newhash');
@@ -222,12 +223,12 @@ describe('UserModel', () => {
 
         test('updatePasswordAndClearToken should clear resetToken fields', async () => {
             mockQuery.mockResolvedValue([{}]);
-            
+
             await UserModel.updatePasswordAndClearToken('newhash', 10);
             expect(mockQuery).toHaveBeenCalledTimes(1);
             expect(mockQuery.mock.calls[0][0]).toBe('UPDATE users SET password = ?, resetToken = NULL, resetTokenExpiry = NULL WHERE id = ?');
         });
-        
+
         test('updateResetToken should update token and expiry', async () => {
             mockQuery.mockResolvedValue([{}]);
             await UserModel.updateResetToken('token', 12345, 1);
@@ -235,7 +236,7 @@ describe('UserModel', () => {
             expect(mockQuery.mock.calls[0][0]).toBe('UPDATE users SET resetToken = ?, resetTokenExpiry = ? WHERE id = ?');
         });
 
-        test('deleteUser should execute DELETE FROM users and return affectedRows', async () => { 
+        test('deleteUser should execute DELETE FROM users and return affectedRows', async () => {
             mockExecute.mockResolvedValue([{ affectedRows: 1 }]);
             const result = await UserModel.deleteUser(5);
             expect(mockExecute).toHaveBeenCalledTimes(1);
@@ -243,7 +244,7 @@ describe('UserModel', () => {
             expect(result).toBe(1);
         });
     });
-    
+
     // --- TESTING ERROR PATHS ---
     describe('Error Paths', () => {
         test('findUserByEmail should return null on no rows found', async () => {
@@ -258,17 +259,17 @@ describe('UserModel', () => {
             await expect(UserModel.updatePassword(1, 'somehash'))
                 .rejects.toThrow('DB Timeout');
         });
-        
+
         test('findUserByNamaLengkap should throw error if query fails', async () => {
             mockQuery.mockRejectedValue(new Error('Name Lookup Failed'));
-            
+
             await expect(UserModel.findUserByNamaLengkap('Test Name'))
                 .rejects.toThrow('Name Lookup Failed');
         });
-        
+
         test('getAllPengurus should throw error if db operation fails', async () => {
             mockExecute.mockRejectedValue(new Error('Pengurus Fetch Error'));
-            
+
             await expect(UserModel.getAllPengurus())
                 .rejects.toThrow('Pengurus Fetch Error');
         });

@@ -1,19 +1,17 @@
-// src/pages/MasterPage.jsx
+// src/admin/MasterPage.jsx
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Users, Package, Edit, Trash2, Upload, Plus, Download, FileText } from "lucide-react";
+import { Users, Package, Edit, Trash2, Upload, Plus, Download, FileText, Search, X, Lock, Key } from "lucide-react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-// TAMBAHKAN IMPORT AddUserForm
 import AddUserForm from "../components/AddUserForm";
+import { BASE_URL } from "../api/axios";
 
 const MasterPage = () => {
   const [activeMenu, setActiveMenu] = useState("master");
   const [dataType, setDataType] = useState("pengurus");
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
-
-  // TAMBAHKAN STATE UNTUK AddUserForm
   const [showAddUserForm, setShowAddUserForm] = useState(false);
 
   // State untuk data dari database
@@ -27,7 +25,7 @@ const MasterPage = () => {
   const [uploadResult, setUploadResult] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // State untuk form inventaris manual - tambahkan status
+  // State untuk form inventaris manual
   const [inventarisForm, setInventarisForm] = useState({
     nama_barang: '',
     kode_barang: '',
@@ -35,18 +33,42 @@ const MasterPage = () => {
     status: 'Tersedia'
   });
 
+  // STATE BARU UNTUK SEARCH DAN EDIT
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // EDIT USER STATE
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({
+    nama_lengkap: '',
+    username: '',
+    email: '',
+    jabatan: '',
+    divisi: ''
+  });
+
+  // EDIT INVENTARIS STATE
+  const [showEditInventarisModal, setShowEditInventarisModal] = useState(false);
+  const [editingInventaris, setEditingInventaris] = useState(null);
+  const [editInventarisForm, setEditInventarisForm] = useState({
+    nama_barang: '',
+    kode_barang: '',
+    jumlah: '',
+    status: 'Tersedia'
+  });
+
+  // Fetch Pengurus
   const fetchPengurus = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         setError('Token tidak ditemukan. Silakan login kembali.');
         return;
       }
 
-      // GANTI endpoint ini sesuai dengan yang digunakan di UserManagementPage
-      const response = await fetch('http://localhost:5000/api/users/', {
+      const response = await fetch(`${BASE_URL}/api/users/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -54,10 +76,7 @@ const MasterPage = () => {
         }
       });
 
-      console.log('📡 MasterPage fetch response:', response.status);
-
       const result = await response.json();
-      console.log('📄 MasterPage fetch result:', result);
 
       if (result.success) {
         setPengurusData(result.data);
@@ -73,17 +92,18 @@ const MasterPage = () => {
     }
   };
 
+  // Fetch Inventaris
   const fetchInventaris = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
+
       if (!token) {
         setError('Token tidak ditemukan. Silakan login kembali.');
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/users/inventaris', {
+      const response = await fetch(`${BASE_URL}/api/users/inventaris`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -116,13 +136,11 @@ const MasterPage = () => {
     }
   }, [dataType]);
 
-  // UPDATE handleOpenModal untuk membedakan pengurus dan inventaris
+  // Handle Open Modal
   const handleOpenModal = (type) => {
     if (type === "manual" && dataType === "pengurus") {
-      // Buka AddUserForm untuk pengurus
       setShowAddUserForm(true);
     } else {
-      // Buka modal biasa untuk upload atau tambah inventaris
       setModalType(type);
       setShowModal(true);
       setUploadResult(null);
@@ -130,27 +148,26 @@ const MasterPage = () => {
     }
   };
 
+  // Handle Close Modal
   const handleCloseModal = () => {
     setShowModal(false);
     setModalType("");
     setUploadResult(null);
     setSelectedFile(null);
-    setInventarisForm({ 
-      nama_barang: '', 
-      kode_barang: '', 
+    setInventarisForm({
+      nama_barang: '',
+      kode_barang: '',
       jumlah: '',
       status: 'Tersedia'
     });
   };
 
-  // FUNGSI CALLBACK SAAT USER DITAMBAHKAN DARI AddUserForm
+  // Handle User Added
   const handleUserAdded = (newUser) => {
-    // Tambahkan user baru ke state pengurus
     setPengurusData(prev => [...prev, newUser]);
-    console.log('New user added to master page:', newUser);
   };
 
-  // FUNGSI UNTUK SUBMIT INVENTARIS MANUAL
+  // Handle Submit Inventaris
   const handleSubmitInventaris = async () => {
     if (!inventarisForm.nama_barang.trim() || !inventarisForm.jumlah) {
       alert('❌ Nama barang dan jumlah harus diisi!');
@@ -164,8 +181,8 @@ const MasterPage = () => {
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/users/inventaris/create', {
+
+      const response = await fetch(`${BASE_URL}/api/users/inventaris/create`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -182,12 +199,8 @@ const MasterPage = () => {
       const result = await response.json();
 
       if (result.success) {
-        alert(`✅ Inventaris berhasil ditambahkan!\n\nBarang: ${result.data.nama_barang}\nKode: ${result.data.kode_barang || 'N/A'}\nJumlah: ${result.data.jumlah} unit\nStatus: ${result.data.status}`);
-        
-        // Refresh data inventaris
+        alert(`✅ Inventaris berhasil ditambahkan!`);
         fetchInventaris();
-        
-        // Close modal dan reset form
         handleCloseModal();
       } else {
         alert('❌ Gagal menambahkan inventaris: ' + result.message);
@@ -198,7 +211,7 @@ const MasterPage = () => {
     }
   };
 
-  // Handle file upload
+  // Handle File Upload
   const handleFileUpload = async () => {
     if (!selectedFile) {
       alert('Pilih file terlebih dahulu');
@@ -211,10 +224,10 @@ const MasterPage = () => {
     try {
       setUploading(true);
       const token = localStorage.getItem('token');
-      
-      const endpoint = dataType === 'pengurus' 
-        ? 'http://localhost:5000/api/users/pengurus/bulk'
-        : 'http://localhost:5000/api/users/inventaris/bulk';
+
+      const endpoint = dataType === 'pengurus'
+        ? `${BASE_URL}/api/users/pengurus/bulk`
+        : `${BASE_URL}/api/users/inventaris/bulk`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -228,7 +241,6 @@ const MasterPage = () => {
 
       if (result.success) {
         setUploadResult(result.data);
-        // Refresh data setelah upload berhasil
         if (dataType === 'pengurus') {
           fetchPengurus();
         } else {
@@ -245,7 +257,7 @@ const MasterPage = () => {
     }
   };
 
-  // Tambahkan function untuk status badge
+  // Get Status Badge
   const getStatusBadge = (status) => {
     const statusConfig = {
       "Tersedia": "bg-green-200 text-green-900",
@@ -257,7 +269,7 @@ const MasterPage = () => {
     return statusConfig[status] || "bg-gray-200 text-gray-900";
   };
 
-  // Tambahkan fungsi delete inventaris - TAMBAHKAN SETELAH getStatusBadge
+  // Handle Delete Inventaris
   const handleDeleteInventaris = async (id, namaBarang) => {
     if (!window.confirm(`Yakin ingin menghapus inventaris "${namaBarang}"?`)) {
       return;
@@ -265,8 +277,8 @@ const MasterPage = () => {
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/users/inventaris/${id}`, {
+
+      const response = await fetch(`${BASE_URL}/api/users/inventaris/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -278,7 +290,7 @@ const MasterPage = () => {
 
       if (result.success) {
         alert(`✅ Inventaris "${namaBarang}" berhasil dihapus!`);
-        fetchInventaris(); // Refresh data
+        fetchInventaris();
       } else {
         alert('❌ Gagal menghapus inventaris: ' + result.message);
       }
@@ -288,7 +300,194 @@ const MasterPage = () => {
     }
   };
 
-  // Download template Excel
+  // ========== FUNGSI BARU UNTUK EDIT USER ==========
+
+  // Handle Open Edit Modal
+  const handleOpenEditModal = (user) => {
+    setEditingUser(user);
+    setEditForm({
+      nama_lengkap: user.nama_lengkap || '',
+      username: user.username || '',
+      email: user.email || '',
+      jabatan: user.jabatan || '',
+      divisi: user.divisi || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle Close Edit Modal
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditingUser(null);
+    setEditForm({
+      nama_lengkap: '',
+      username: '',
+      email: '',
+      jabatan: '',
+      divisi: ''
+    });
+  };
+
+  // Handle Submit Edit User
+  const handleSubmitEdit = async () => {
+    if (!editForm.nama_lengkap.trim() || !editForm.username.trim() || !editForm.email.trim()) {
+      alert('❌ Nama lengkap, username, dan email harus diisi!');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editForm)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('✅ Data pengurus berhasil diupdate!');
+        fetchPengurus();
+        handleCloseEditModal();
+      } else {
+        alert('❌ Gagal mengupdate data: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('❌ Terjadi kesalahan: ' + error.message);
+    }
+  };
+
+  // Handle Delete User (Fungsi Baru)
+  const handleDeleteUser = async (id, nama) => {
+    if (!window.confirm(`⚠️ Yakin ingin menghapus user "${nama}"? Data yang dihapus tidak dapat dikembalikan.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/api/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ User "${nama}" berhasil dihapus.`);
+        fetchPengurus();
+      } else {
+        alert('❌ Gagal menghapus user: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error delete user:', error);
+      alert('❌ Terjadi kesalahan saat menghapus user.');
+    }
+  };
+
+  // Handle Reset Password (Fungsi Baru)
+  const handleResetPassword = async (id, nama) => {
+    const newPassword = prompt(`Masukkan password baru untuk user "${nama}":`, "123456");
+    if (newPassword === null) return; // Cancelled
+    if (!newPassword.trim()) {
+      alert("❌ Password tidak boleh kosong!");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/api/users/${id}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ new_password: newPassword })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ Password untuk user "${nama}" berhasil direset!`);
+      } else {
+        alert('❌ Gagal mereset password: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error reset password:', error);
+      alert('❌ Terjadi kesalahan saat reset password.');
+    }
+  };
+
+  // ========== FUNGSI BARU UNTUK EDIT INVENTARIS ==========
+
+  // Handle Open Edit Inventaris Modal
+  const handleOpenEditInventarisModal = (item) => {
+    setEditingInventaris(item);
+    setEditInventarisForm({
+      nama_barang: item.nama_barang,
+      kode_barang: item.kode_barang || '',
+      jumlah: item.jumlah,
+      status: item.status || 'Tersedia'
+    });
+    setShowEditInventarisModal(true);
+  };
+
+  // Handle Close Edit Inventaris Modal
+  const handleCloseEditInventarisModal = () => {
+    setShowEditInventarisModal(false);
+    setEditingInventaris(null);
+    setEditInventarisForm({
+      nama_barang: '',
+      kode_barang: '',
+      jumlah: '',
+      status: 'Tersedia'
+    });
+  };
+
+  // Handle Submit Edit Inventaris
+  const handleSubmitInventarisEdit = async () => {
+    if (!editInventarisForm.nama_barang.trim() || !editInventarisForm.jumlah) {
+      alert('❌ Nama barang dan jumlah harus diisi!');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/api/users/inventaris/${editingInventaris.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          nama_barang: editInventarisForm.nama_barang.trim(),
+          kode_barang: editInventarisForm.kode_barang.trim() || null,
+          jumlah: parseInt(editInventarisForm.jumlah),
+          status: editInventarisForm.status
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`✅ Data ${editInventarisForm.nama_barang} berhasil diupdate!`);
+        fetchInventaris();
+        handleCloseEditInventarisModal();
+      } else {
+        alert('❌ Gagal mengupdate data: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error updating inventaris:', error);
+      alert('❌ Terjadi kesalahan: ' + error.message);
+    }
+  };
+
+  // Download Template
   const downloadTemplate = () => {
     if (dataType === 'pengurus') {
       const csvContent = "nama_lengkap,username,email,divisi,jabatan\n" +
@@ -296,7 +495,7 @@ const MasterPage = () => {
         "Jane Smith,jane.smith,jane.smith@email.com,Administrasi,Sekretaris\n" +
         "Bob Johnson,bob.johnson,bob.johnson@email.com,Keuangan,Bendahara\n" +
         "Alice Brown,alice.brown,alice.brown@email.com,Teknologi Informasi,Anggota";
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -305,14 +504,13 @@ const MasterPage = () => {
       a.click();
       window.URL.revokeObjectURL(url);
     } else {
-      // UPDATE template inventaris - kode_barang dibiarkan kosong
       const csvContent = "nama_barang,kode_barang,jumlah,status\n" +
         "Kursi Plastik,,50,Tersedia\n" +
         "Meja Lipat,,25,Tersedia\n" +
         "Sound System,,2,Dipinjam\n" +
         "Proyektor,,1,Rusak\n" +
         "Kabel HDMI,,5,Tersedia";
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -323,14 +521,41 @@ const MasterPage = () => {
     }
   };
 
-  const data = dataType === "pengurus" ? pengurusData : inventarisData;
+  // ========== FUNGSI FILTER DATA BERDASARKAN SEARCH ==========
+  const filteredData = () => {
+    const currentData = dataType === "pengurus" ? pengurusData : inventarisData;
+
+    if (!searchQuery.trim()) {
+      return currentData;
+    }
+
+    const query = searchQuery.toLowerCase();
+
+    if (dataType === "pengurus") {
+      return currentData.filter(item =>
+        item.nama_lengkap?.toLowerCase().includes(query) ||
+        item.username?.toLowerCase().includes(query) ||
+        item.email?.toLowerCase().includes(query) ||
+        item.jabatan?.toLowerCase().includes(query) ||
+        item.divisi?.toLowerCase().includes(query)
+      );
+    } else {
+      return currentData.filter(item =>
+        item.nama_barang?.toLowerCase().includes(query) ||
+        item.kode_barang?.toLowerCase().includes(query) ||
+        item.status?.toLowerCase().includes(query)
+      );
+    }
+  };
+
+  const data = filteredData();
 
   // Loading state
   if (loading) {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex bg-gray-50 h-screen overflow-hidden">
         <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Navbar />
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -346,16 +571,16 @@ const MasterPage = () => {
   // Error state
   if (error) {
     return (
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex bg-gray-50 h-screen overflow-hidden">
         <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <Navbar />
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                 <p className="font-bold">Error</p>
                 <p>{error}</p>
-                <button 
+                <button
                   onClick={dataType === 'pengurus' ? fetchPengurus : fetchInventaris}
                   className="mt-2 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
                 >
@@ -370,13 +595,13 @@ const MasterPage = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex bg-gray-50 h-screen overflow-hidden">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
         <Navbar />
 
         <motion.div
-          className="flex-1 p-6 space-y-6 overflow-auto"
+          className="flex-1 p-6 space-y-6 overflow-x-hidden overflow-y-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -402,13 +627,12 @@ const MasterPage = () => {
               </button>
               <button
                 onClick={() => handleOpenModal("manual")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black ${
-                  dataType === "pengurus" 
-                    ? "bg-gradient-to-r from-pink-500 to-pink-600" 
-                    : "bg-gradient-to-r from-green-500 to-green-600"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium shadow-md hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black ${dataType === "pengurus"
+                  ? "bg-gradient-to-r from-pink-500 to-pink-600"
+                  : "bg-gradient-to-r from-green-500 to-green-600"
+                  }`}
               >
-                <Plus size={18} /> 
+                <Plus size={18} />
                 {dataType === "pengurus" ? "Tambah Pengurus" : "Tambah Inventaris"}
               </button>
             </div>
@@ -417,22 +641,20 @@ const MasterPage = () => {
           {/* Tab Buttons */}
           <div className="flex gap-2 bg-white p-1 rounded-lg shadow-sm border-2 border-black w-fit">
             <button
-              className={`px-4 py-2 rounded-md font-medium transition-all duration-200 border-2 ${
-                dataType === "pengurus"
-                  ? "bg-pink-500 text-white shadow-md border-black"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent hover:border-gray-300"
-              }`}
+              className={`px-4 py-2 rounded-md font-medium transition-all duration-200 border-2 ${dataType === "pengurus"
+                ? "bg-pink-500 text-white shadow-md border-black"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent hover:border-gray-300"
+                }`}
               onClick={() => setDataType("pengurus")}
             >
               <Users size={16} className="inline mr-2" />
               Data Pengurus
             </button>
             <button
-              className={`px-4 py-2 rounded-md font-medium transition-all duration-200 border-2 ${
-                dataType === "inventaris"
-                  ? "bg-green-500 text-white shadow-md border-black"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent hover:border-gray-300"
-              }`}
+              className={`px-4 py-2 rounded-md font-medium transition-all duration-200 border-2 ${dataType === "inventaris"
+                ? "bg-green-500 text-white shadow-md border-black"
+                : "text-gray-600 hover:text-gray-900 hover:bg-gray-50 border-transparent hover:border-gray-300"
+                }`}
               onClick={() => setDataType("inventaris")}
             >
               <Package size={16} className="inline mr-2" />
@@ -447,13 +669,40 @@ const MasterPage = () => {
                 {dataType === "pengurus" ? "📋 Daftar Pengurus" : "📦 Daftar Inventaris"}
               </h2>
               <p className="text-sm text-gray-600 mt-1">
-                {dataType === "pengurus" 
+                {dataType === "pengurus"
                   ? `Menampilkan ${data.length} data pengurus`
                   : `Menampilkan ${data.length} jenis barang inventaris`
                 }
               </p>
             </div>
-            
+
+            {/* SEARCH BOX */}
+            <div className="px-6 py-3 border-b border-gray-200">
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder={`Cari ${dataType === "pengurus" ? "pengurus (nama, username, email, jabatan, divisi)" : "inventaris (nama barang, kode, status)"}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+              {searchQuery && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Menampilkan {data.length} hasil dari {dataType === "pengurus" ? pengurusData.length : inventarisData.length} total data
+                </p>
+              )}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -466,6 +715,7 @@ const MasterPage = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jabatan</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Divisi</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                       </>
                     ) : (
                       <>
@@ -510,6 +760,31 @@ const MasterPage = () => {
                                 {item.divisi || 'N/A'}
                               </span>
                             </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleResetPassword(item.id, item.nama_lengkap)}
+                                  className="text-yellow-600 hover:text-yellow-800 p-1 hover:bg-yellow-50 rounded transition-colors"
+                                  title="Reset Password"
+                                >
+                                  <Key size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleOpenEditModal(item)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit pengurus"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteUser(item.id, item.nama_lengkap)}
+                                  className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"
+                                  title="Hapus user"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
                           </>
                         ) : (
                           <>
@@ -540,13 +815,22 @@ const MasterPage = () => {
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <button 
-                                onClick={() => handleDeleteInventaris(item.id, item.nama_barang)}
-                                className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"
-                                title="Hapus inventaris"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleOpenEditInventarisModal(item)}
+                                  className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded transition-colors"
+                                  title="Edit inventaris"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteInventaris(item.id, item.nama_barang)}
+                                  className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition-colors"
+                                  title="Hapus inventaris"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </td>
                           </>
                         )}
@@ -554,8 +838,11 @@ const MasterPage = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={dataType === "pengurus" ? "6" : "6"} className="px-6 py-4 text-center text-gray-500">
-                        {dataType === "pengurus" ? "Tidak ada data pengurus" : "Tidak ada data inventaris"}
+                      <td colSpan={dataType === "pengurus" ? "7" : "6"} className="px-6 py-4 text-center text-gray-500">
+                        {searchQuery
+                          ? `Tidak ada hasil untuk "${searchQuery}"`
+                          : (dataType === "pengurus" ? "Tidak ada data pengurus" : "Tidak ada data inventaris")
+                        }
                       </td>
                     </tr>
                   )}
@@ -564,7 +851,7 @@ const MasterPage = () => {
             </div>
           </div>
 
-          {/* TAMBAHKAN AddUserForm Component */}
+          {/* AddUserForm Component */}
           <AddUserForm
             isOpen={showAddUserForm}
             onClose={() => setShowAddUserForm(false)}
@@ -582,8 +869,8 @@ const MasterPage = () => {
               >
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">
-                    {modalType === "upload" 
-                      ? "📤 Upload Data Bulk" 
+                    {modalType === "upload"
+                      ? "📤 Upload Data Bulk"
                       : `✏️ Tambah ${dataType === "pengurus" ? "Pengurus" : "Inventaris"} Manual`
                     }
                   </h3>
@@ -597,10 +884,10 @@ const MasterPage = () => {
                         </label>
                         <div className="border-2 border-dashed border-black rounded-lg p-6 text-center hover:border-gray-600 transition-colors">
                           <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                          <input 
-                            type="file" 
-                            accept=".xlsx,.csv,.xls" 
-                            className="hidden" 
+                          <input
+                            type="file"
+                            accept=".xlsx,.csv,.xls"
+                            className="hidden"
                             id="fileInput"
                             onChange={(e) => setSelectedFile(e.target.files[0])}
                           />
@@ -634,7 +921,7 @@ const MasterPage = () => {
                       </div>
 
                       {/* Upload Button */}
-                      <button 
+                      <button
                         onClick={handleFileUpload}
                         disabled={uploading || !selectedFile}
                         className="w-full bg-gradient-to-r from-pink-500 to-pink-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black disabled:opacity-50 disabled:cursor-not-allowed"
@@ -650,7 +937,7 @@ const MasterPage = () => {
                             <p className="text-green-600">✅ Berhasil: {uploadResult.total_success} data</p>
                             <p className="text-red-600">❌ Gagal: {uploadResult.total_errors} data</p>
                           </div>
-                          
+
                           {uploadResult.errors && uploadResult.errors.length > 0 && (
                             <div className="mt-3">
                               <p className="font-medium text-red-700">Error Details:</p>
@@ -665,7 +952,7 @@ const MasterPage = () => {
                       )}
                     </div>
                   ) : (
-                    // Form Manual untuk Inventaris saja (Pengurus sudah menggunakan AddUserForm)
+                    // Form Manual untuk Inventaris saja
                     dataType === "inventaris" && (
                       <div className="space-y-4">
                         <div>
@@ -674,7 +961,7 @@ const MasterPage = () => {
                             type="text"
                             placeholder="Masukkan nama barang"
                             value={inventarisForm.nama_barang}
-                            onChange={(e) => setInventarisForm({...inventarisForm, nama_barang: e.target.value})}
+                            onChange={(e) => setInventarisForm({ ...inventarisForm, nama_barang: e.target.value })}
                             className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-colors"
                           />
                         </div>
@@ -684,7 +971,7 @@ const MasterPage = () => {
                             type="text"
                             placeholder="Masukkan kode barang"
                             value={inventarisForm.kode_barang}
-                            onChange={(e) => setInventarisForm({...inventarisForm, kode_barang: e.target.value})}
+                            onChange={(e) => setInventarisForm({ ...inventarisForm, kode_barang: e.target.value })}
                             className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-colors"
                           />
                         </div>
@@ -695,7 +982,7 @@ const MasterPage = () => {
                             placeholder="Masukkan jumlah barang"
                             min="1"
                             value={inventarisForm.jumlah}
-                            onChange={(e) => setInventarisForm({...inventarisForm, jumlah: e.target.value})}
+                            onChange={(e) => setInventarisForm({ ...inventarisForm, jumlah: e.target.value })}
                             className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-colors"
                           />
                         </div>
@@ -703,7 +990,7 @@ const MasterPage = () => {
                           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                           <select
                             value={inventarisForm.status}
-                            onChange={(e) => setInventarisForm({...inventarisForm, status: e.target.value})}
+                            onChange={(e) => setInventarisForm({ ...inventarisForm, status: e.target.value })}
                             className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition-colors"
                           >
                             <option value="Tersedia">Tersedia</option>
@@ -713,7 +1000,7 @@ const MasterPage = () => {
                             <option value="Hilang">Hilang</option>
                           </select>
                         </div>
-                        <button 
+                        <button
                           onClick={handleSubmitInventaris}
                           className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black"
                         >
@@ -729,6 +1016,165 @@ const MasterPage = () => {
                       className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors border-2 border-black"
                     >
                       Batal
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* EDIT USER MODAL */}
+          {showEditModal && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl border-2 border-black"
+              >
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                    ✏️ Edit Data Pengurus
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                      <input
+                        type="text"
+                        value={editForm.nama_lengkap}
+                        onChange={(e) => setEditForm({ ...editForm, nama_lengkap: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={editForm.username}
+                        onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Jabatan</label>
+                      <input
+                        type="text"
+                        value={editForm.jabatan}
+                        onChange={(e) => setEditForm({ ...editForm, jabatan: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Divisi</label>
+                      <input
+                        type="text"
+                        value={editForm.divisi}
+                        onChange={(e) => setEditForm({ ...editForm, divisi: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-6 pt-4 border-t-2 border-black">
+                    <button
+                      onClick={handleCloseEditModal}
+                      className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors border-2 border-black"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleSubmitEdit}
+                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black"
+                    >
+                      💾 Simpan Perubahan
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+
+          {/* EDIT INVENTARIS MODAL */}
+          {showEditInventarisModal && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 p-4">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white rounded-xl w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl border-2 border-black"
+              >
+                <div className="p-6">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4">
+                    ✏️ Edit Data Inventaris
+                  </h3>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nama Barang</label>
+                      <input
+                        type="text"
+                        value={editInventarisForm.nama_barang}
+                        onChange={(e) => setEditInventarisForm({ ...editInventarisForm, nama_barang: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Kode Barang</label>
+                      <input
+                        type="text"
+                        value={editInventarisForm.kode_barang}
+                        onChange={(e) => setEditInventarisForm({ ...editInventarisForm, kode_barang: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={editInventarisForm.jumlah}
+                        onChange={(e) => setEditInventarisForm({ ...editInventarisForm, jumlah: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={editInventarisForm.status}
+                        onChange={(e) => setEditInventarisForm({ ...editInventarisForm, status: e.target.value })}
+                        className="w-full px-3 py-2 border-2 border-black rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
+                      >
+                        <option value="Tersedia">Tersedia</option>
+                        <option value="Habis">Habis</option>
+                        <option value="Dipinjam">Dipinjam</option>
+                        <option value="Rusak">Rusak</option>
+                        <option value="Hilang">Hilang</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-6 pt-4 border-t-2 border-black">
+                    <button
+                      onClick={handleCloseEditInventarisModal}
+                      className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg font-medium hover:bg-gray-200 transition-colors border-2 border-black"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={handleSubmitInventarisEdit}
+                      className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg hover:scale-105 transition-all duration-200 border-2 border-black"
+                    >
+                      💾 Simpan Perubahan
                     </button>
                   </div>
                 </div>

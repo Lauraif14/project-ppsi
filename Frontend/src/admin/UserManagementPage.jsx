@@ -4,13 +4,14 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import { motion } from "framer-motion";
 import { Pencil, Trash2, Plus, Key } from "lucide-react"; // Tambah import Key
+import { BASE_URL } from "../api/axios";
 import AddUserForm from "../components/AddUserForm";
 
 const UserManagement = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [editingUser, setEditingUser] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -18,17 +19,17 @@ const UserManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       console.log('🚀 Starting fetch...');
-      
+
       const token = localStorage.getItem('token');
       console.log('🔑 Token exists:', !!token);
-      
+
       if (!token) {
         throw new Error('No authentication token found');
       }
-      
-      const response = await fetch('http://localhost:5000/api/users/', {
+
+      const response = await fetch(`${BASE_URL}/api/users/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -56,7 +57,7 @@ const UserManagement = () => {
       console.error('❌ Fetch Error Details:', err);
       console.error('❌ Error name:', err.name);
       console.error('❌ Error message:', err.message);
-      
+
       if (err.name === 'TypeError' && err.message.includes('fetch')) {
         setError('Cannot connect to server. Is the backend running on port 5000?');
       } else if (err.message.includes('token')) {
@@ -81,11 +82,11 @@ const UserManagement = () => {
   // Update User
   const handleUpdateUser = async (e) => {
     e.preventDefault();
-    
+
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/users/${editingUser.id}`, {
+
+      const response = await fetch(`${BASE_URL}/api/users/${editingUser.id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -119,15 +120,15 @@ const UserManagement = () => {
   // Hapus User
   const handleDeleteUser = async (id) => {
     const user = users.find(u => u.id === id);
-    
+
     if (!window.confirm(`Yakin ingin menghapus user ${user?.nama_lengkap}?`)) {
       return;
     }
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/users/${id}`, {
+
+      const response = await fetch(`${BASE_URL}/api/users/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -157,8 +158,8 @@ const UserManagement = () => {
 
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch(`http://localhost:5000/api/users/${id}/reset-password`, {
+
+      const response = await fetch(`${BASE_URL}/api/users/${id}/reset-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -212,7 +213,7 @@ const UserManagement = () => {
               <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded max-w-md">
                 <p className="font-bold">❌ Error</p>
                 <p className="mb-3">{error}</p>
-                <button 
+                <button
                   onClick={fetchUsers}
                   className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
                 >
@@ -262,7 +263,7 @@ const UserManagement = () => {
           {/* Tabel User */}
           <div className="bg-white border-2 border-gray-200 p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-semibold mb-4">Daftar Pengurus ({users.length} orang)</h3>
-            
+
             {users.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <p>Belum ada data pengurus</p>
@@ -300,7 +301,7 @@ const UserManagement = () => {
                         <td className="p-3 flex justify-center gap-3">
                           <button
                             className="p-2 bg-yellow-400 rounded-lg border border-black hover:bg-yellow-500 transition-colors"
-                            onClick={() => setEditingUser({...user})}
+                            onClick={() => setEditingUser({ ...user })}
                             title="Edit pengurus"
                           >
                             <Pencil size={16} />

@@ -1,95 +1,34 @@
-// src/components/Navbar.jsx
-
-import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import React from "react";
+import { LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { jwtDecode } from "jwt-decode"; // <-- 1. Impor untuk dekode token
 
 const Navbar = () => {
-  const [open, setOpen] = useState(false);
-  // 1. State untuk menyimpan data pengguna dari token
-  const [userData, setUserData] = useState({ role: "User" }); // Default value
-  const navigate = useNavigate();
-  const dropdownRef = useRef(null); // <-- 2. Ref untuk dropdown
+    const navigate = useNavigate();
 
-  // 1. Mengambil dan mendekode token saat komponen dimuat
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setUserData(decoded); // Simpan seluruh data dari token (misal: { id, role })
-      } catch (error) {
-        console.error("Token tidak valid:", error);
-        handleLogout(); // Logout jika token tidak bisa didekode
-      }
-    }
-  }, []);
-
-  // 2. Efek untuk menutup dropdown saat klik di luar
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setOpen(false);
-      }
+    const handleLogout = () => {
+        if (window.confirm("Apakah Anda yakin ingin keluar?")) {
+            localStorage.removeItem("token");
+            navigate("/login");
+        }
     };
-    // Tambahkan event listener
-    document.addEventListener("mousedown", handleClickOutside);
-    // Hapus event listener saat komponen unmount
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [dropdownRef]);
 
+    return (
+        <div className="w-full h-[74px] bg-white text-gray-800 flex items-center justify-between px-6 shadow-sm border-b-2 border-black z-40 sticky top-0">
+            {/* Branding */}
+            <div className="font-black text-xl tracking-tighter flex items-center gap-2 select-none">
+                <span className="text-pink-600 text-3xl">BESTI</span>
+                <span className="text-gray-900 text-xs bg-gray-100 px-2 py-1 rounded border-2 border-black font-bold">PANEL USER</span>
+            </div>
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/login");
-  };
-
-  return (
-    <div className="w-full h-16 bg-white text-gray-800 flex items-center justify-between px-8 border-b-2 border-black shadow-sm">
-      {/* Brand Title */}
-      <h1 className="text-xl font-bold tracking-wide text-gray-900"></h1>
-
-      {/* Profile Dropdown */}
-      <div className="relative" ref={dropdownRef}> {/* <-- 2. Terapkan ref di sini */}
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 bg-pink-500 text-white px-4 py-2 rounded-lg font-semibold border-2 border-black hover:bg-pink-600 transition capitalize"
-        >
-          {/* 1. Tampilkan role dari state userData */}
-          {userData.role} <ChevronDown size={18} />
-        </button>
-
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute right-0 mt-2 w-40 bg-white border-2 border-black rounded-lg shadow-md overflow-hidden z-50"
-          >
             <button
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
-              onClick={() => {
-                navigate("/profile");
-                setOpen(false);
-              }}
+                onClick={handleLogout}
+                className="flex items-center gap-2 bg-red-500 text-white px-5 py-2.5 rounded-xl font-bold border-2 border-black hover:bg-red-600 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 transition-all shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0 active:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
             >
-              Settings
+                <LogOut size={18} strokeWidth={3} />
+                Keluar
             </button>
-            <button
-              className="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600 font-semibold"
-              onClick={handleLogout}
-            >
-              Logout
-            </button>
-          </motion.div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+    );
 };
 
 export default Navbar;

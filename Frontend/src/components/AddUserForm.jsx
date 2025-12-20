@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BASE_URL } from "../api/axios";
 
 const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
   const [formData, setFormData] = useState({
@@ -38,7 +39,7 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
       ...prev,
       [name]: value
     }));
-    
+
     // Auto generate username dari nama lengkap
     if (name === 'nama_lengkap') {
       const autoUsername = value
@@ -50,7 +51,7 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
         username: autoUsername
       }));
     }
-    
+
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({
@@ -117,17 +118,17 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
     setLoading(true);
-    
+
     try {
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://localhost:5000/api/users/create-account', {
+
+      const response = await fetch(`${BASE_URL}/api/users/create-account`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -148,12 +149,12 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
 
       if (result.success) {
         alert(`✅ Akun berhasil ditambahkan!\n\nNama: ${result.user.nama_lengkap}\nUsername: ${result.user.username}\nEmail: ${result.user.email}\nJabatan: ${result.user.jabatan}\nDivisi: ${result.user.divisi}\nRole: ${result.user.role}`);
-        
+
         // Call callback to refresh user list
         if (onUserAdded) {
           onUserAdded(result.user);
         }
-        
+
         // Close modal
         onClose();
       } else {
@@ -203,9 +204,8 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               value={formData.nama_lengkap}
               onChange={handleInputChange}
               placeholder="Masukkan nama lengkap"
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.nama_lengkap ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.nama_lengkap ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             />
             {errors.nama_lengkap && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.nama_lengkap}</p>
@@ -223,9 +223,8 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               value={formData.username}
               onChange={handleInputChange}
               placeholder="username.login"
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.username ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.username ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             />
             <p className="text-xs text-gray-500 mt-1">Auto generated dari nama, bisa diedit manual</p>
             {errors.username && (
@@ -244,9 +243,8 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               value={formData.email}
               onChange={handleInputChange}
               placeholder="contoh@email.com"
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.email ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.email ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             />
             {errors.email && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.email}</p>
@@ -264,9 +262,8 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               value={formData.password}
               onChange={handleInputChange}
               placeholder="Minimal 6 karakter"
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.password ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.password ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             />
             {errors.password && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.password}</p>
@@ -284,9 +281,8 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               value={formData.confirmPassword}
               onChange={handleInputChange}
               placeholder="Ulangi password"
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.confirmPassword ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.confirmPassword ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             />
             {errors.confirmPassword && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.confirmPassword}</p>
@@ -302,19 +298,18 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               name="jabatan"
               value={formData.jabatan}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.jabatan ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.jabatan ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             >
-                <option value="">Pilih Jabatan</option>
-                <option value="Gubernur">Gubernur</option>
-                <option value="Wakil Gubernur">Wakil Gubernur</option>
-                <option value="Sekretaris Daerah"> Sekretaris Daerah</option>
-                <option value="Bendahara Daerah">Bendahara Daerah</option>
-                <option value="Kepala Dinas">Kepala Dinas</option>
-                <option value="Sekretaris Dinas">Sekretaris Dinas</option>
-                <option value="Bendahara Dinas">Bendahara Dinas</option>
-                <option value="Anggota">Anggota</option>
+              <option value="">Pilih Jabatan</option>
+              <option value="Gubernur">Gubernur</option>
+              <option value="Wakil Gubernur">Wakil Gubernur</option>
+              <option value="Sekretaris Daerah"> Sekretaris Daerah</option>
+              <option value="Bendahara Daerah">Bendahara Daerah</option>
+              <option value="Kepala Dinas">Kepala Dinas</option>
+              <option value="Sekretaris Dinas">Sekretaris Dinas</option>
+              <option value="Bendahara Dinas">Bendahara Dinas</option>
+              <option value="Anggota">Anggota</option>
             </select>
             {errors.jabatan && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.jabatan}</p>
@@ -330,22 +325,21 @@ const AddUserForm = ({ isOpen, onClose, onUserAdded }) => {
               name="divisi"
               value={formData.divisi}
               onChange={handleInputChange}
-              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${
-                errors.divisi ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
-              }`}
+              className={`w-full px-3 py-2 border-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 ${errors.divisi ? 'border-red-500' : 'border-gray-300 focus:border-pink-500'
+                }`}
             >
-                <option value="">Pilih Divisi</option>
-                <option value="Inti">Inti</option>
-                <option value="Audkes">Audkes</option>
-                <option value="Medinkraf">Medinkraf</option>
-                <option value="Adkesma">Adkesma</option>
-                <option value="PSDM">PSDM</option>
-                <option value="Eksternal">Eksternal</option>
-                <option value="Internal">Internal</option>
-                <option value="Bistech">Bistech</option>
-                <option value="Ristek">Ristek</option>
-                <option value="Kastrat">Kastrat</option>
-                <option value="Sosmasling">Sosmasling</option>
+              <option value="">Pilih Divisi</option>
+              <option value="Inti">Inti</option>
+              <option value="Audkes">Audkes</option>
+              <option value="Medinkraf">Medinkraf</option>
+              <option value="Adkesma">Adkesma</option>
+              <option value="PSDM">PSDM</option>
+              <option value="Eksternal">Eksternal</option>
+              <option value="Internal">Internal</option>
+              <option value="Bistech">Bistech</option>
+              <option value="Ristek">Ristek</option>
+              <option value="Kastrat">Kastrat</option>
+              <option value="Sosmasling">Sosmasling</option>
             </select>
             {errors.divisi && (
               <p className="text-red-500 text-sm mt-1">❌ {errors.divisi}</p>

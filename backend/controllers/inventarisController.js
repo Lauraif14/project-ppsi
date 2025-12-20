@@ -1,14 +1,14 @@
 // controllers/inventarisController.js (Bentuk Class/OOP)
 
 // Mengimpor secara statis karena ini adalah helper/Model
-const InventarisModel = require('../models/inventarisModel'); 
-const { parseUploadedFile, cleanupFile } = require('../utils/uploadUtils'); 
+const InventarisModel = require('../models/inventarisModel');
+const { parseUploadedFile, cleanupFile } = require('../utils/uploadUtils');
 
 
 const validStatuses = ['Tersedia', 'Habis', 'Dipinjam', 'Rusak', 'Hilang'];
 
 class InventarisController {
-    
+
     async getAllInventaris(req, res) {
         try {
             const rows = await InventarisModel.getAllInventaris();
@@ -22,7 +22,7 @@ class InventarisController {
     async createInventaris(req, res) {
         try {
             const { nama_barang, kode_barang, jumlah, status } = req.body;
-            
+
             if (!nama_barang || !jumlah) {
                 return res.status(400).json({ success: false, message: 'Nama barang dan jumlah harus diisi' });
             }
@@ -45,7 +45,7 @@ class InventarisController {
 
             const insertId = await InventarisModel.createInventaris(data);
             const newInventaris = await InventarisModel.findInventarisById(insertId);
-            
+
             res.json({ success: true, message: 'Inventaris berhasil ditambahkan', data: newInventaris });
         } catch (error) {
             console.error('Error creating inventaris:', error);
@@ -56,22 +56,22 @@ class InventarisController {
     async deleteInventaris(req, res) {
         try {
             const { id } = req.params;
-            
+
             if (!id || isNaN(id)) {
                 return res.status(400).json({ success: false, message: 'ID inventaris tidak valid' });
             }
-            
+
             const existingItem = await InventarisModel.findInventarisById(id);
             if (!existingItem) {
                 return res.status(404).json({ success: false, message: 'Item inventaris tidak ditemukan' });
             }
-            
+
             const affectedRows = await InventarisModel.deleteInventaris(id);
-            
+
             if (affectedRows === 0) {
                 return res.status(500).json({ success: false, message: 'Gagal menghapus inventaris' });
             }
-            
+
             res.json({ success: true, message: 'Inventaris berhasil dihapus', data: existingItem });
         } catch (error) {
             console.error('Error deleting inventaris:', error);
@@ -79,15 +79,59 @@ class InventarisController {
         }
     };
 
+    async updateInventaris(req, res) {
+        try {
+            const { id } = req.params;
+            const { nama_barang, kode_barang, jumlah, status } = req.body;
+
+            if (!id || isNaN(id)) {
+                return res.status(400).json({ success: false, message: 'ID inventaris tidak valid' });
+            }
+
+            const existingItem = await InventarisModel.findInventarisById(id);
+            if (!existingItem) {
+                return res.status(404).json({ success: false, message: 'Item inventaris tidak ditemukan' });
+            }
+
+            if (!nama_barang || !jumlah) {
+                return res.status(400).json({ success: false, message: 'Nama barang dan jumlah harus diisi' });
+            }
+
+            const parsedJumlah = parseInt(jumlah);
+            if (isNaN(parsedJumlah) || parsedJumlah <= 0) {
+                return res.status(400).json({ success: false, message: 'Jumlah harus berupa angka dan lebih dari 0' });
+            }
+
+            if (status && !validStatuses.includes(status)) {
+                return res.status(400).json({ success: false, message: 'Status tidak valid. Harus salah satu dari: ' + validStatuses.join(', ') });
+            }
+
+            const data = {
+                nama_barang: nama_barang.trim(),
+                kode_barang: kode_barang && kode_barang.trim() ? kode_barang.trim() : null,
+                jumlah: parsedJumlah,
+                status: status || 'Tersedia'
+            };
+
+            await InventarisModel.updateInventaris(id, data);
+            const updatedItem = await InventarisModel.findInventarisById(id);
+
+            res.json({ success: true, message: 'Inventaris berhasil diupdate', data: updatedItem });
+        } catch (error) {
+            console.error('Error updating inventaris:', error);
+            res.status(500).json({ success: false, message: 'Error updating inventaris', error: error.message });
+        }
+    };
+
     async bulkCreateInventaris(req, res) {
         let filePath = null;
-        
+
         try {
             if (!req.file) {
-                return res.status(400).json({ 
-                success: false, 
-                message: 'File tidak ditemukan' 
-            });
+                return res.status(400).json({
+                    success: false,
+                    message: 'File tidak ditemukan'
+                });
             }
 
             filePath = req.file.path;
@@ -109,7 +153,7 @@ class InventarisController {
             // 2. Process Data
             const results = [];
             const errors = [];
-            
+
             for (let i = 0; i < jsonData.length; i++) {
                 const row = jsonData[i];
                 const rowNumber = i + 2;
@@ -131,7 +175,7 @@ class InventarisController {
                     }
 
                     const existingItem = await InventarisModel.findInventarisByName(namaBarang);
-                    
+
                     if (existingItem) {
                         // Update existing item quantity
                         await InventarisModel.updateInventarisQuantity(namaBarang, jumlah, kodeBarang, status);

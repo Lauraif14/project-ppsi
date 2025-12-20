@@ -14,4 +14,10 @@ router.get('/inventaris-status', verifyAdmin, laporanController.getInventarisSta
 // GET Laporan Checklist Inventaris berdasarkan tanggal
 router.get('/inventaris', verifyAdmin, laporanController.getInventarisLaporanByDate);
 
+// GET Laporan Piket Mingguan
+router.get('/piket/weekly', verifyAdmin, laporanController.getWeeklyPiketReport);
+
+// GET Laporan Piket Bulanan
+router.get('/piket/monthly', verifyAdmin, laporanController.getMonthlyPiketReport);
+
 module.exports = router;

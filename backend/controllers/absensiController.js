@@ -1,15 +1,16 @@
 // controllers/absensiController.js 
 
 const path = require('path');
-const axios = require('axios'); 
+const axios = require('axios');
 const sharp = require('sharp');
 
 // Import Models
 const AbsensiModel = require('../models/absensiModel');
 const InventarisModel = require('../models/inventarisModel');
+const JadwalModel = require('../models/jadwalModel');
 
 class AbsensiController {
-    
+
     // --- Logika Bisnis Watermark (Method Internal) ---
     async #addWatermark(imageBuffer, latitude, longitude) {
         try {
@@ -37,11 +38,11 @@ class AbsensiController {
                 .resize(600)
                 .composite([{ input: svgBuffer, gravity: 'southwest' }])
                 .toBuffer();
-                
+
         } catch (error) {
             console.error("Gagal menambahkan watermark:", error.message);
             // Mengembalikan buffer asli jika watermark gagal
-            return imageBuffer; 
+            return imageBuffer;
         }
     };
     // -----------------------------------------------------------------
@@ -51,22 +52,33 @@ class AbsensiController {
         try {
             const { latitude, longitude } = req.body;
             const userId = req.user.id;
-            
+
             if (!req.file) return res.status(400).json({ message: 'Foto absensi diperlukan.' });
             if (!latitude || !longitude) return res.status(400).json({ message: 'Lokasi (latitude dan longitude) diperlukan.' });
 
-            // 1. Cek Sesi Aktif
+            // 1. Validasi Jadwal Piket - Cek apakah user dijadwalkan hari ini
+            const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+            const jadwalHariIni = await JadwalModel.getJadwalByDate(today);
+            const isScheduledToday = jadwalHariIni.some(jadwal => jadwal.user_id === userId);
+
+            if (!isScheduledToday) {
+                return res.status(403).json({
+                    message: 'Anda tidak dijadwalkan piket hari ini. Hanya pengurus yang dijadwalkan yang dapat melakukan absensi.'
+                });
+            }
+
+            // 2. Cek Sesi Aktif
             const activeSession = await AbsensiModel.findActiveSession(userId);
             if (activeSession) {
                 return res.status(400).json({ message: 'Anda sudah memiliki sesi absen yang aktif.' });
             }
-            
+
             // 2. Logika Bisnis: Watermark
             const watermarkedBuffer = await this.#addWatermark(req.file.buffer, latitude, longitude);
-            
+
             // 3. Logika Bisnis: Simpan File
             const filename = `absen-${userId}-${Date.now()}.jpg`;
-            const filePath = path.join(process.cwd(), 'public', 'uploads', 'absensi', filename); 
+            const filePath = path.join(process.cwd(), 'public', 'uploads', 'absensi', filename);
             await sharp(watermarkedBuffer).toFile(filePath);
 
             const foto_path = path.join('uploads', 'absensi', filename).replace(/\\/g, '/');
@@ -106,7 +118,7 @@ class AbsensiController {
         try {
             const { absensiId, checklist } = req.body;
             const userId = req.user.id;
-            
+
             const checklistJson = JSON.stringify(checklist);
 
             // 1. Update Absensi
@@ -116,7 +128,7 @@ class AbsensiController {
             for (const item of checklist) {
                 await InventarisModel.updateStatus(item.inventaris_id, item.status);
             }
-            
+
             res.json({ message: 'Laporan inventaris telah dikirim dan status master telah diperbarui.' });
         } catch (error) {
             console.error("Error saat submit checklist:", error);
@@ -141,7 +153,7 @@ class AbsensiController {
             if (sesiAbsen.waktu_keluar) {
                 return res.status(400).json({ message: 'Anda sudah melakukan absen keluar untuk sesi ini.' });
             }
-            
+
             // 2. Logika Bisnis: Validasi Durasi Piket
             const waktuMasuk = new Date(sesiAbsen.waktu_masuk);
             const selisihMenit = (new Date() - waktuMasuk) / (1000 * 60);
@@ -154,15 +166,15 @@ class AbsensiController {
             if (!sesiAbsen.checklist_submitted) {
                 return res.status(400).json({ message: 'Harap kirim checklist inventaris sebelum absen keluar.' });
             }
-            
+
             // 4. Logika Bisnis: Watermark & Simpan File
             const watermarkedBuffer = await this.#addWatermark(req.file.buffer, latitude, longitude);
             const filename = `absen-keluar-${userId}-${Date.now()}.jpg`;
             const filePath = path.join(process.cwd(), 'public', 'uploads', 'absensi', filename);
             await sharp(watermarkedBuffer).toFile(filePath);
-            
+
             const foto_path_keluar = path.join('uploads', 'absensi', filename).replace(/\\/g, '/');
-            
+
             // 5. Update DB
             const updateData = {
                 waktu_keluar: new Date(),
@@ -183,9 +195,9 @@ class AbsensiController {
     async getAbsensiStatus(req, res) {
         try {
             const sesiAbsen = await AbsensiModel.findCurrentActiveSession(req.user.id);
-            
+
             if (!sesiAbsen) return res.json(null);
-            
+
             const hariMasuk = new Date(sesiAbsen.waktu_masuk).toDateString();
             const hariIni = new Date().toDateString();
 
@@ -202,7 +214,7 @@ class AbsensiController {
     async getAbsensiHistory(req, res) {
         try {
             const history = await AbsensiModel.getHistory(req.user.id);
-            
+
             const historyWithFullUrl = history.map(item => ({
                 ...item,
                 // Logika Bisnis: Buat URL lengkap
@@ -219,13 +231,13 @@ class AbsensiController {
     async getLaporanAbsensi(req, res) {
         try {
             const { date } = req.query;
-            
+
             if (!date) {
                 return res.status(400).json({ success: false, message: 'Parameter tanggal diperlukan' });
             }
-            
+
             const rows = await AbsensiModel.getLaporanByDate(date);
-            
+
             res.json({
                 success: true,
                 data: rows,
@@ -242,9 +254,9 @@ class AbsensiController {
     async getTodayAbsensi(req, res) {
         try {
             const today = new Date().toISOString().slice(0, 10);
-            
+
             const rows = await AbsensiModel.getTodayAbsensiStatus(today);
-            
+
             res.json({
                 success: true,
                 data: rows,
