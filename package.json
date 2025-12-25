@@ -1,8 +1,12 @@
 {
+  "scripts": {
+    "test:perf": "artillery run performance-tests/artillery-config.yml"
+  },
   "dependencies": {
     "jwt-decode": "^4.0.0"
   },
   "devDependencies": {
+    "artillery": "^2.0.27",
     "axios": "^1.13.2",
     "cross-env": "^10.1.0",
     "jest": "^30.2.0",

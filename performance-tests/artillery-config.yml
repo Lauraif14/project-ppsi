@@ -1,0 +1,17 @@
+config:
+  target: "https://besti.app"
+  phases:
+    - duration: 30
+      arrivalRate: 10
+      rampTo: 50
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 100
+      name: "Sustained load (100 users/sec)"
+  ensure:
+    p95: 3000
+    maxErrorRate: 1
+scenarios:
+  - flow:
+      - get:
+          url: "/"

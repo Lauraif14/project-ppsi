@@ -19,6 +19,10 @@ app.use(cors()); // Izinkan request dari domain lain (React app Anda)
 app.use(express.json()); // Agar bisa membaca body request dalam format JSON
 app.use(express.static('public'));
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/absensi', absensiRoutes);
