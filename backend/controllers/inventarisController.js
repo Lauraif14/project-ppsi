@@ -81,6 +81,7 @@ class InventarisController {
 
     async updateInventaris(req, res) {
         try {
+
             const { id } = req.params;
             const { nama_barang, kode_barang, jumlah, status } = req.body;
 

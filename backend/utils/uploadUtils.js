@@ -55,22 +55,28 @@ const informasiStorage = multer.diskStorage({
     }
 });
 
+const informasiFileFilter = (req, file, cb) => {
+    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png'];
+    const fileExt = path.extname(file.originalname).toLowerCase();
+
+    if (allowedTypes.includes(fileExt)) {
+        cb(null, true);
+    } else {
+        cb(new Error('File type tidak didukung. Gunakan PDF, DOC, DOCX, TXT, atau gambar'), false);
+    }
+};
+
 exports.uploadInformasi = multer({
     storage: informasiStorage,
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png'];
-        const fileExt = path.extname(file.originalname).toLowerCase();
-
-        if (allowedTypes.includes(fileExt)) {
-            cb(null, true);
-        } else {
-            cb(new Error('File type tidak didukung. Gunakan PDF, DOC, DOCX, TXT, atau gambar'), false);
-        }
-    },
+    fileFilter: informasiFileFilter,
     limits: {
         fileSize: 10 * 1024 * 1024 // 10MB limit
     }
 });
+
+// Export internal configs for testing
+exports.informasiStorage = informasiStorage;
+exports.informasiFileFilter = informasiFileFilter;
 
 
 /**
