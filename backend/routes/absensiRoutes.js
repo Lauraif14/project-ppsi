@@ -18,8 +18,12 @@ const bind = (method) => method.bind(absensiController);
 // Endpoint Absen MASUK
 router.post('/masuk', verifyToken, upload.single('foto_absen'), bind(absensiController.absenMasuk));
 
+// Endpoint Get Checklist Inventaris
+router.get('/checklist', verifyToken, bind(absensiController.getChecklist));
+
 // Endpoint Kirim Laporan Inventaris
 router.post('/submit-checklist', verifyToken, bind(absensiController.submitChecklist));
+
 
 // Endpoint Absen KELUAR
 router.post('/keluar', verifyToken, upload.single('foto_absen'), bind(absensiController.absenKeluar));
@@ -36,6 +40,5 @@ router.get('/laporan', verifyToken, bind(absensiController.getLaporanAbsensi));
 
 // Endpoint Absensi Hari Ini (untuk admin/pengurus)
 router.get('/today', verifyToken, bind(absensiController.getTodayAbsensi));
-
 
 module.exports = router;

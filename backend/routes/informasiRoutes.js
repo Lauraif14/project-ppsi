@@ -13,6 +13,8 @@ router.get('/', verifyToken, informasiController.getAllInformasi);
 // Mengambil informasi aktif untuk dashboard
 router.get('/active', verifyToken, informasiController.getActiveInformasi);
 
+
+
 /**
  * RUTE KHUSUS ADMIN (MANAJEMEN DOKUMEN)
  */

@@ -59,7 +59,9 @@ class AbsensiController {
             // 1. Validasi Jadwal Piket - Cek apakah user dijadwalkan hari ini
             const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
             const jadwalHariIni = await JadwalModel.getJadwalByDate(today);
-            const isScheduledToday = jadwalHariIni.some(jadwal => jadwal.user_id === userId);
+
+            // Fix: Casting Number untuk menghindari masalah string vs number dari JWT
+            const isScheduledToday = jadwalHariIni.some(jadwal => Number(jadwal.user_id) === Number(userId));
 
             if (!isScheduledToday) {
                 return res.status(403).json({
@@ -113,16 +115,73 @@ class AbsensiController {
         }
     }
 
+    // Endpoint Get Checklist Inventaris
+    async getChecklist(req, res) {
+        try {
+            const userId = req.user.id;
+
+            // Ambil sesi aktif
+            const activeSession = await AbsensiModel.findCurrentActiveSession(userId);
+
+            if (!activeSession) {
+                return res.status(404).json({ message: 'Tidak ada sesi absensi aktif.' });
+            }
+
+            let checklist = [];
+            // Coba parse jika ada
+            if (activeSession.inventaris_checklist) {
+                try {
+                    checklist = JSON.parse(activeSession.inventaris_checklist);
+                } catch (e) {
+                    checklist = [];
+                }
+            }
+
+            // JIKA CHECKLIST KOSONG (misal: absen sebelum fitur ini ada), GENERATE BARU
+            if (!checklist || checklist.length === 0) {
+                const inventarisItems = await InventarisModel.findAllItems();
+                checklist = inventarisItems.map(item => ({
+                    inventaris_id: item.id,
+                    kode_barang: item.kode_barang,
+                    nama: item.nama_barang,
+                    status: item.status,
+                    catatan: ''
+                }));
+
+                // Update DB: simpan checklist awal ini
+                await AbsensiModel.updateChecklist(
+                    activeSession.id,
+                    userId,
+                    JSON.stringify(checklist),
+                    activeSession.note || ''
+                );
+            }
+
+            res.json({
+                success: true,
+                data: {
+                    absensiId: activeSession.id,
+                    checklist: checklist,
+                    checklistSubmitted: activeSession.checklist_submitted,
+                    note: activeSession.note || ''
+                }
+            });
+        } catch (error) {
+            console.error("Error saat get checklist:", error);
+            res.status(500).json({ message: 'Gagal mengambil checklist.' });
+        }
+    }
+
     // Endpoint Kirim Laporan Inventaris
     async submitChecklist(req, res) {
         try {
-            const { absensiId, checklist } = req.body;
+            const { absensiId, checklist, note } = req.body;
             const userId = req.user.id;
 
             const checklistJson = JSON.stringify(checklist);
 
-            // 1. Update Absensi
-            await AbsensiModel.updateChecklist(absensiId, userId, checklistJson);
+            // 1. Update Absensi dengan checklist dan note
+            await AbsensiModel.updateChecklist(absensiId, userId, checklistJson, note || '');
 
             // 2. Update Status Inventaris Master
             for (const item of checklist) {
@@ -191,22 +250,61 @@ class AbsensiController {
         }
     }
 
-    // Endpoint Get Status Absensi Terkini
+    // Endpoint Get Status Absensi Terkini (Active atau Hari Ini)
     async getAbsensiStatus(req, res) {
         try {
-            const sesiAbsen = await AbsensiModel.findCurrentActiveSession(req.user.id);
+            // 1. Cek Sesi Aktif (Belum Logout) - Prioritas Utama (Support Lintas Hari)
+            const activeSession = await AbsensiModel.findCurrentActiveSession(req.user.id);
+            if (activeSession) {
+                const sessionDate = new Date(activeSession.waktu_masuk).toDateString();
+                const todayDate = new Date().toDateString();
 
-            if (!sesiAbsen) return res.json(null);
+                // Jika masih HARI INI -> Sedang Bertugas
+                if (sessionDate === todayDate) {
+                    return res.json({
+                        success: true,
+                        data: {
+                            ...activeSession,
+                            status: 'sedang'
+                        }
+                    });
+                } else {
+                    // Jika SUDAH GANTI HARI -> Tidak Lengkap (Kedaluwarsa)
+                    return res.json({
+                        success: true,
+                        data: {
+                            ...activeSession,
+                            status: 'tidak_lengkap'
+                        }
+                    });
+                }
+            }
 
-            const hariMasuk = new Date(sesiAbsen.waktu_masuk).toDateString();
-            const hariIni = new Date().toDateString();
+            // 2. Cek History Terakhir (Untuk status 'sudah' jika hari ini)
+            const history = await AbsensiModel.getHistory(req.user.id);
+            if (history && history.length > 0) {
+                const lastSession = history[0];
+                const todayVal = new Date().toISOString().split('T')[0];
+                // Handling timezone sederhana (UTC vs Local agak tricky, pakai toDateString aman)
+                const sessionDate = new Date(lastSession.waktu_masuk).toDateString();
+                const todayDate = new Date().toDateString();
 
-            // Logika Bisnis: Cek apakah sesi ini hari ini
-            if (hariMasuk !== hariIni) return res.json(null);
+                if (sessionDate === todayDate) {
+                    return res.json({
+                        success: true,
+                        data: {
+                            ...lastSession,
+                            status: 'sudah'
+                        }
+                    });
+                }
+            }
 
-            res.json(sesiAbsen);
+            // 3. Tidak ada status aktif atau hari ini
+            return res.json({ success: true, data: null });
         } catch (error) {
-            res.status(500).json({ message: 'Gagal mengambil status absensi.' });
+            console.error("Error get absensi status:", error);
+            res.status(500).json({ success: false, message: 'Gagal mengambil status absensi.' });
         }
     }
 

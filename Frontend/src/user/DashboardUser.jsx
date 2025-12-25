@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import JadwalPiket from "./JadwalPiket";
 import AbsensiKamera from "./AbsensiKamera";
 import UserProfileModal from "./UserProfileModal";
+import CekInventarisModal from "./CekInventarisModal";
+import PapanPengumuman from "../components/PapanPengumuman";
 import api, { BASE_URL } from "../api/axios";
 import { jwtDecode } from "jwt-decode";
 import {
@@ -13,7 +15,8 @@ import {
     Video,
     LogOut,
     UserCheck,
-    Clock
+    Clock,
+    Package
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -33,6 +36,7 @@ const DashboardUser = () => {
 
     // State Modal
     const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showInventarisModal, setShowInventarisModal] = useState(false);
     const [pesanDashboard, setPesanDashboard] = useState("");
 
     // Load User Data
@@ -77,25 +81,51 @@ const DashboardUser = () => {
                 setInformasiList([]);
             }
 
-            // 2. Fetch Status Piket Hari Ini
-            const jadwalRes = await api.get('/jadwal/hari-ini');
+            // 2. Fetch Status Piket & Absensi (Sinkronisasi Logic Baru)
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const todayName = days[new Date().getDay()];
 
-            if (jadwalRes.data.success && jadwalRes.data.data) {
-                const todaySchedule = jadwalRes.data.data;
-                const mySchedule = todaySchedule.pengurus.find(p =>
-                    (p.user_id == userId) || (p.id == userId)
-                );
+            // Gunakan Promise.all untuk fetch paralel: Jadwal Master & Status Absensi Real-time
+            const [piketRes, absensiRes] = await Promise.all([
+                api.get('/piket/jadwal'),
+                api.get('/absensi/status').catch(() => ({ data: { success: false } }))
+            ]);
 
-                if (mySchedule) {
-                    setIsPiketToday(true);
-                    setAbsenStatus(mySchedule.status);
-                    if (mySchedule.absensi_id) {
-                        setAbsensiId(mySchedule.absensi_id);
-                    }
-                } else {
-                    setIsPiketToday(false);
+            let isPiket = false;
+            let currentStatus = 'belum';
+            let currentAbsensiId = null;
+
+            // 1. Cek apakah user ada di jadwal hari ini (Master Jadwal)
+            if (piketRes.data.success && Array.isArray(piketRes.data.data)) {
+                const todaySchedule = piketRes.data.data.find(item => item.hari === todayName);
+                if (todaySchedule && todaySchedule.pengurus) {
+                    // Cari ID user di daftar pengurus
+                    const me = todaySchedule.pengurus.find(p => p.id == userId || p.user_id == userId);
+                    if (me) isPiket = true;
                 }
             }
+
+            // 2. Cek status absensi aktual dari database (Override status jika sudah absen)
+            if (absensiRes.data && absensiRes.data.success && absensiRes.data.data) {
+                const absensiData = absensiRes.data.data;
+                // Pastikan status string dan lowercase, jika tidak ada status, anggap masih proses (sedang) atau error
+                if (absensiData.status) {
+                    currentStatus = absensiData.status.toLowerCase();
+                    currentAbsensiId = absensiData.id;
+                    isPiket = true;
+                }
+            }
+
+            // Normalisasi status default jika undefined/null tapi isPiket true
+            if (isPiket && !currentStatus) {
+                currentStatus = 'belum';
+            }
+
+            console.log("DEBUG DASHBOARD:", { isPiket, currentStatus, currentAbsensiId });
+
+            setIsPiketToday(isPiket);
+            setAbsenStatus(currentStatus);
+            setAbsensiId(currentAbsensiId);
         } catch (error) {
             console.error("Error loading dashboard:", error);
         } finally {
@@ -231,24 +261,62 @@ const DashboardUser = () => {
                                                     </span>
                                                 </div>
                                             )}
+
+                                            {absenStatus === 'tidak_lengkap' && (
+                                                <div className="flex flex-col items-center">
+                                                    <div className="w-24 h-24 bg-red-100 rounded-full border-2 border-black flex items-center justify-center mb-3 animate-pulse">
+                                                        <AlertCircle size={40} className="text-red-600" />
+                                                    </div>
+                                                    <span className="px-4 py-2 bg-red-100 border-2 border-black rounded-lg font-bold text-red-700">
+                                                        Tidak Lengkap
+                                                    </span>
+                                                    <p className="text-xs text-red-600 mt-2 font-medium max-w-[200px]">
+                                                        Anda lupa absen keluar. Sesi dianggap hangus.
+                                                    </p>
+                                                </div>
+                                            )}
+
                                         </div>
 
-                                        {absenStatus === 'belum' && (
+                                        {/* Fallback UI untuk status aneh/tidak valid */}
+                                        {!['belum', 'sedang', 'sudah', 'tidak_lengkap'].includes(absenStatus) && (
+                                            <div className="flex flex-col items-center text-red-500 py-4">
+                                                <AlertCircle size={40} className="mb-2 opacity-50" />
+                                                <p className="font-bold text-sm">Status data tidak valid ({String(absenStatus)})</p>
+                                                <p className="text-xs mb-4">Silakan hubungi admin atau coba refresh.</p>
+                                                <button
+                                                    onClick={() => handleAbsenClick('masuk')}
+                                                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-bold text-gray-800 transition-colors"
+                                                >
+                                                    Paksa Absen Masuk
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        {(absenStatus === 'belum' || absenStatus === 'tidak_lengkap') && (
                                             <button
                                                 onClick={() => handleAbsenClick('masuk')}
-                                                className="w-full py-4 bg-green-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2"
+                                                className={`w-full py-4 ${absenStatus === 'tidak_lengkap' ? 'bg-orange-500' : 'bg-green-500'} text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2`}
                                             >
-                                                <Video size={24} /> ABSEN MASUK
+                                                <Video size={24} /> {absenStatus === 'tidak_lengkap' ? 'MULAI BARU' : 'ABSEN MASUK'}
                                             </button>
                                         )}
 
                                         {absenStatus === 'sedang' && (
-                                            <button
-                                                onClick={() => handleAbsenClick('keluar')}
-                                                className="w-full py-4 bg-red-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <LogOut size={24} /> ABSEN KELUAR
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => setShowInventarisModal(true)}
+                                                    className="w-full py-4 bg-purple-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2 mb-3"
+                                                >
+                                                    <Package size={24} /> CEK INVENTARIS
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAbsenClick('keluar')}
+                                                    className="w-full py-4 bg-red-500 text-white rounded-xl border-2 border-black font-black text-lg hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:-translate-y-1 active:translate-y-0 active:shadow-none transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <LogOut size={24} /> ABSEN KELUAR
+                                                </button>
+                                            </>
                                         )}
 
                                         {absenStatus === 'sudah' && (
@@ -284,89 +352,46 @@ const DashboardUser = () => {
                         </div>
 
                         {/* COLUMN 3: Informasi */}
-                        <div className="bg-white rounded-xl shadow-sm border-2 border-black overflow-hidden h-full lg:h-[600px] flex flex-col">
-                            <div className="bg-yellow-100 p-4 border-b-2 border-black flex items-center gap-2 shrink-0">
-                                <div className="bg-yellow-500 p-1.5 rounded border-2 border-black text-white">
-                                    <Megaphone size={16} strokeWidth={3} />
-                                </div>
-                                <h2 className="font-bold text-lg text-gray-900">Papan Pengumuman</h2>
-                            </div>
-
-                            <div className="p-6 flex-1 overflow-y-auto custom-scrollbar relative">
-                                {informasiList.length === 0 ? (
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-gray-400">
-                                        <div className="bg-gray-50 p-4 rounded-full border-2 border-dashed border-gray-300 mb-3">
-                                            <AlertCircle size={32} className="opacity-50" />
-                                        </div>
-                                        <p className="font-medium">Tidak ada informasi baru</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {informasiList.map((info) => (
-                                            <div key={info.id} className="group relative bg-white border-2 border-black rounded-xl p-5 hover:bg-yellow-50 transition-colors shadow-sm hover:shadow-md border-b-4 border-r-4 border-black">
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <h3 className="font-black text-gray-900 text-lg leading-tight">
-                                                            {info.judul}
-                                                        </h3>
-                                                        <span className="text-[10px] bg-yellow-200 text-yellow-900 px-2 py-0.5 rounded border border-black mt-2 inline-block font-bold uppercase tracking-wider">
-                                                            {info.kategori}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-gray-700 text-sm font-medium mb-4 whitespace-pre-wrap leading-relaxed">
-                                                    {info.isi}
-                                                </div>
-
-                                                <div className="flex items-center justify-between pt-3 border-t border-gray-200 mt-2">
-                                                    <span className="text-[10px] font-bold text-gray-500 flex items-center gap-1">
-                                                        <Clock size={10} />
-                                                        {new Date(info.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                    </span>
-
-                                                    {info.file_path && (
-                                                        <a
-                                                            href={`${BASE_URL}/${info.file_path}`}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-                                                        >
-                                                            <div className="bg-blue-100 p-1 rounded-sm border border-black">
-                                                                <Megaphone size={10} />
-                                                            </div>
-                                                            Unduh
-                                                        </a>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <PapanPengumuman />
                     </div>
                 </div>
-            </main>
+            </main >
 
             {/* Modals */}
-            {showCamera && (
-                <AbsensiKamera
-                    mode={cameraMode}
-                    absensiId={absensiId}
-                    onClose={() => setShowCamera(false)}
-                    setPesanDashboard={setPesanDashboard}
-                    onSuccess={handleAbsensiSuccess}
-                />
-            )}
+            {
+                showCamera && (
+                    <AbsensiKamera
+                        mode={cameraMode}
+                        absensiId={absensiId}
+                        onClose={() => setShowCamera(false)}
+                        setPesanDashboard={setPesanDashboard}
+                        onSuccess={handleAbsensiSuccess}
+                    />
+                )
+            }
 
-            {showProfileModal && (
-                <UserProfileModal
-                    userData={userData}
-                    onClose={() => setShowProfileModal(false)}
-                    onUpdate={handleProfileUpdate}
-                />
-            )}
+            {
+                showProfileModal && (
+                    <UserProfileModal
+                        userData={userData}
+                        onClose={() => setShowProfileModal(false)}
+                        onUpdate={handleProfileUpdate}
+                    />
+                )
+            }
+
+            {
+                showInventarisModal && (
+                    <CekInventarisModal
+                        isOpen={showInventarisModal}
+                        onClose={() => setShowInventarisModal(false)}
+                        onSubmitSuccess={() => {
+                            setPesanDashboard("✅ Checklist inventaris berhasil disimpan!");
+                            setShowInventarisModal(false);
+                        }}
+                    />
+                )
+            }
 
             <style jsx>{`
                 .custom-scrollbar::-webkit-scrollbar {
@@ -383,7 +408,7 @@ const DashboardUser = () => {
                     background: #9ca3af;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

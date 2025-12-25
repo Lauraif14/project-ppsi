@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import JadwalPiketContent from "./JadwalPiketContent";
+import PapanPengumumanContent from "./PapanPengumumanContent";
 import { Users, Calendar, FileText, Package, Clock, TrendingUp, RefreshCw, AlertCircle, Download } from "lucide-react";
 import { BASE_URL } from "../api/axios";
 
@@ -77,15 +79,48 @@ const DashboardAdmin = () => {
 
       // Process responses
       const pengurusData = pengurusResponse.ok ? await pengurusResponse.json() : { success: false, data: [] };
-      const jadwalData = jadwalResponse.ok ? await jadwalResponse.json() : { success: false, data: {} };
+      const jadwalData = jadwalResponse.ok ? await jadwalResponse.json() : { success: false, data: [] };
       const inventarisData = inventarisResponse.ok ? await inventarisResponse.json() : { success: false, data: [] };
       const informasiData = informasiResponse.ok ? await informasiResponse.json() : { success: false, data: [] };
 
+      console.log('📅 Jadwal Data:', jadwalData);
+
       // Calculate data
       const totalPengurus = pengurusData.success ? pengurusData.data.length : 0;
-      const pengurusHariIni = jadwalData.success && jadwalData.data[todayIndonesian]
-        ? jadwalData.data[todayIndonesian]
+
+      // Get today's date in YYYY-MM-DD format (local timezone)
+      const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+        .toISOString().split('T')[0];
+      console.log('📆 Today Date:', todayDate);
+      console.log('📆 Today Indonesian:', todayIndonesian);
+
+      // Find today's schedule from the array - try multiple methods
+      let todaySchedule = null;
+
+      if (jadwalData.success && Array.isArray(jadwalData.data)) {
+        // Method 1: Match by exact date
+        todaySchedule = jadwalData.data.find(item => item.tanggal === todayDate);
+
+        // Method 2: If not found, try matching by day name
+        if (!todaySchedule) {
+          todaySchedule = jadwalData.data.find(item => item.hari === todayIndonesian);
+        }
+
+        // Method 3: If still not found, try the first item (for testing)
+        if (!todaySchedule && jadwalData.data.length > 0) {
+          console.log('⚠️ No exact match, using first available schedule');
+          todaySchedule = jadwalData.data[0];
+        }
+      }
+
+      console.log('🎯 Today Schedule:', todaySchedule);
+
+      const pengurusHariIni = todaySchedule && todaySchedule.pengurus
+        ? todaySchedule.pengurus
         : [];
+
+      console.log('👥 Pengurus Hari Ini:', pengurusHariIni);
+
       const jadwalHariIni = pengurusHariIni.length;
       const totalInventaris = inventarisData.success ? inventarisData.data.length : 0;
 
@@ -283,108 +318,38 @@ const DashboardAdmin = () => {
               </motion.div>
             </div>
 
-            {/* Informasi Piket Hari Ini & Informasi Sistem */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Card Piket Hari Ini Detail */}
+            {/* Grid 2 Kolom: Jadwal Piket | Informasi Terbaru */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+              {/* COLUMN 1: Jadwal Piket Hari Ini - Admin Style */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 }}
-                className="bg-white border-2 border-black rounded-xl shadow-sm p-6 flex flex-col h-full"
+                className="bg-white border-2 border-black rounded-xl shadow-sm overflow-hidden flex flex-col"
               >
-                <h2 className="font-semibold text-xl mb-4 flex items-center gap-2">
-                  <Clock className="text-blue-500" size={24} />
-                  Piket {todayIndonesian} Hari Ini
-                </h2>
-
-                {dashboardData.pengurusHariIni.length > 0 ? (
-                  <div className="space-y-3 flex-1 overflow-y-auto max-h-[400px]">
-                    {dashboardData.pengurusHariIni.map((pengurus, index) => (
-                      <motion.div
-                        key={index}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 + index * 0.1 }}
-                        className="flex items-center gap-3 p-3 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                      >
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-lg border-2 border-black shadow-sm">
-                          {pengurus.nama_lengkap?.charAt(0) || 'P'}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900">{pengurus.nama_lengkap}</p>
-                          <p className="text-sm text-blue-600">{pengurus.divisi || '-'}</p>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-500 flex-1 flex flex-col justify-center">
-                    <Calendar size={64} className="mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-semibold text-gray-700 mb-1">Tidak ada piket hari ini</p>
-                    <p className="text-sm">
-                      {todayIndonesian === 'Sabtu' || todayIndonesian === 'Minggu'
-                        ? 'Hari libur - Tidak ada jadwal piket'
-                        : 'Jadwal piket belum diatur untuk hari ini'
-                      }
-                    </p>
-                  </div>
-                )}
+                <div className="p-6 border-b-2 border-gray-200">
+                  <h2 className="font-semibold text-xl flex items-center gap-2">
+                    <Clock className="text-blue-500" size={24} />
+                    Piket {todayIndonesian} Hari Ini
+                  </h2>
+                </div>
+                <JadwalPiketContent />
               </motion.div>
 
-              {/* Card Informasi Sistem */}
+              {/* COLUMN 2: Informasi Terbaru - Admin Style */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.5 }}
-                className="bg-white border-2 border-black rounded-xl shadow-sm p-6 flex flex-col h-full"
+                className="bg-white border-2 border-black rounded-xl shadow-sm overflow-hidden flex flex-col"
               >
-                <h2 className="font-semibold text-xl mb-4 flex items-center gap-2">
-                  <FileText className="text-green-500" size={24} />
-                  Informasi Terbaru
-                </h2>
-
-                {dashboardData.informasiList.length > 0 ? (
-                  <div className="space-y-4 flex-1 overflow-y-auto max-h-[400px] pr-2">
-                    {dashboardData.informasiList.map((info, index) => (
-                      <motion.div
-                        key={info.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.6 + index * 0.1 }}
-                        className="p-4 bg-gray-50 border-2 border-gray-200 rounded-lg hover:border-green-400 transition-colors"
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="font-bold text-gray-900">{info.judul}</h3>
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-medium border border-green-200">
-                            {info.kategori}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 line-clamp-3 mb-2">{info.isi}</p>
-                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-400">
-                            {new Date(info.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </p>
-                          {info.file_path && (
-                            <a
-                              href={`${BASE_URL}/${info.file_path}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-blue-600 hover:underline flex items-center gap-1 font-medium"
-                            >
-                              <Download size={12} /> Unduh Lampiran
-                            </a>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-500 flex-1 flex flex-col justify-center bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg">
-                    <AlertCircle size={48} className="mx-auto mb-3 opacity-50" />
-                    <p className="font-medium">Belum ada informasi terbaru</p>
-                    <p className="text-xs mt-1">Informasi yang dibuat akan muncul di sini</p>
-                  </div>
-                )}
+                <div className="p-6 border-b-2 border-gray-200">
+                  <h2 className="font-semibold text-xl flex items-center gap-2">
+                    <FileText className="text-green-500" size={24} />
+                    Informasi Terbaru
+                  </h2>
+                </div>
+                <PapanPengumumanContent />
               </motion.div>
             </div>
 

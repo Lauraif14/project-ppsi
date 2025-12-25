@@ -180,7 +180,7 @@ class JadwalController {
     }
 
     /**
-     * Get jadwal by date range
+     * Get jadwal by date range with absensi data
      * GET /api/piket/jadwal?start_date=...&end_date=...
      */
     async getJadwal(req, res) {
@@ -200,8 +200,56 @@ class JadwalController {
                 jadwal = await JadwalModel.getCurrentWeekSchedule();
             }
 
+            // Get all absensi data for the date range
+            const db = require('../db');
+
+            // Jika tidak ada jadwal, ambil absensi minggu ini
+            let dates = jadwal.length > 0 ? [...new Set(jadwal.map(j => j.tanggal))] : [];
+
+            // Jika tidak ada jadwal sama sekali, ambil absensi 7 hari terakhir
+            if (dates.length === 0) {
+                const today = new Date();
+                const weekAgo = new Date(today);
+                weekAgo.setDate(today.getDate() - 7);
+
+                const [absensiDates] = await db.query(`
+                    SELECT DISTINCT DATE(waktu_masuk) as tanggal
+                    FROM absensi
+                    WHERE DATE(waktu_masuk) >= ?
+                    ORDER BY tanggal DESC
+                `, [weekAgo.toISOString().split('T')[0]]);
+
+                dates = absensiDates.map(row => row.tanggal);
+            }
+
+            let absensiData = [];
+            if (dates.length > 0) {
+                const placeholders = dates.map(() => 'DATE(waktu_masuk) = ?').join(' OR ');
+                const [rows] = await db.query(`
+                    SELECT 
+                        a.user_id,
+                        DATE(a.waktu_masuk) as tanggal,
+                        a.waktu_masuk,
+                        a.waktu_keluar,
+                        a.checklist_submitted,
+                        a.note,
+                        a.foto_path,
+                        a.foto_path_keluar,
+                        u.nama_lengkap,
+                        u.divisi,
+                        u.avatar_url
+                    FROM absensi a
+                    JOIN users u ON a.user_id = u.id
+                    WHERE ${placeholders}
+                    ORDER BY a.waktu_masuk DESC
+                `, dates);
+                absensiData = rows;
+            }
+
             // Group by date
             const grouped = {};
+
+            // Pertama, masukkan semua jadwal
             jadwal.forEach(item => {
                 if (!grouped[item.tanggal]) {
                     grouped[item.tanggal] = {
@@ -210,13 +258,72 @@ class JadwalController {
                         pengurus: []
                     };
                 }
+
+                // Find absensi for this user on this date
+                const absensi = absensiData.find(a =>
+                    a.user_id === item.user_id && a.tanggal === item.tanggal
+                );
+
+                let status = 'belum';
+                if (absensi) {
+                    status = absensi.waktu_keluar ? 'sudah' : 'sedang';
+                }
+
                 grouped[item.tanggal].pengurus.push({
                     id: item.user_id,
                     user_id: item.user_id,
                     nama_lengkap: item.nama_lengkap,
                     divisi: item.divisi,
-                    avatar_url: item.avatar_url
+                    avatar_url: item.avatar_url,
+                    status: status,
+                    waktu_masuk: absensi ? new Date(absensi.waktu_masuk).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+                    waktu_keluar: absensi && absensi.waktu_keluar ? new Date(absensi.waktu_keluar).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+                    checklist_submitted: absensi ? absensi.checklist_submitted : false,
+                    note: absensi ? absensi.note : null,
+                    foto_path: absensi ? absensi.foto_path : null,
+                    foto_path_keluar: absensi ? absensi.foto_path_keluar : null
                 });
+            });
+
+            // Kedua, tambahkan absensi yang tidak ada di jadwal
+            absensiData.forEach(absensi => {
+                const tanggal = absensi.tanggal;
+
+                // Cek apakah tanggal sudah ada di grouped
+                if (!grouped[tanggal]) {
+                    // Buat entry baru untuk tanggal ini
+                    const date = new Date(tanggal);
+                    const hariIndonesia = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+
+                    grouped[tanggal] = {
+                        tanggal: tanggal,
+                        hari: hariIndonesia[date.getDay()],
+                        pengurus: []
+                    };
+                }
+
+                // Cek apakah user ini sudah ada di pengurus untuk tanggal ini
+                const existingUser = grouped[tanggal].pengurus.find(p => p.user_id === absensi.user_id);
+
+                if (!existingUser) {
+                    // User belum ada di jadwal, tambahkan dari data absensi
+                    let status = absensi.waktu_keluar ? 'sudah' : 'sedang';
+
+                    grouped[tanggal].pengurus.push({
+                        id: absensi.user_id,
+                        user_id: absensi.user_id,
+                        nama_lengkap: absensi.nama_lengkap,
+                        divisi: absensi.divisi,
+                        avatar_url: absensi.avatar_url,
+                        status: status,
+                        waktu_masuk: new Date(absensi.waktu_masuk).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+                        waktu_keluar: absensi.waktu_keluar ? new Date(absensi.waktu_keluar).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-',
+                        checklist_submitted: absensi.checklist_submitted || false,
+                        note: absensi.note || null,
+                        foto_path: absensi.foto_path || null,
+                        foto_path_keluar: absensi.foto_path_keluar || null
+                    });
+                }
             });
 
             res.json({
@@ -240,7 +347,10 @@ class JadwalController {
     async getJadwalHariIni(req, res) {
         try {
             const today = new Date().toISOString().split('T')[0];
+            console.log('📅 Getting Jadwal Hari Ini for date:', today);
+
             const jadwal = await JadwalModel.getJadwalByDate(today);
+            console.log(`✅ Found ${jadwal.length} jadwal entries`);
 
             // Get absensi status
             const absensiHariIni = await JadwalModel.getAbsensiStatusForToday(today);
