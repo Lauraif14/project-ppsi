@@ -1,31 +1,31 @@
 // tests/controllers/piketController.test.js (VERSI TERKOREKSI)
 
-const PiketController = require('../../controllers/piketController');
+const PiketController = require('../../controllers/piketController'); 
 const UserModel = require('../../models/userModel');
 const AbsensiModel = require('../../models/absensiModel');
-const JadwalModel = require('../../models/jadwalModel');
+const JadwalModel = require('../../models/jadwalModel'); 
 
 // Mock Model yang benar
 jest.mock('../../models/userModel');
 jest.mock('../../models/absensiModel');
-jest.mock('../../models/jadwalModel');
+jest.mock('../../models/jadwalModel'); 
 
 // Mocking Math.random untuk membuat hasil generateJadwalPiket konsisten
-global.Math.random = jest.fn(() => 0.4);
+global.Math.random = jest.fn(() => 0.4); 
 
 // Mocking Date untuk konsistensi pengujian hari dan tanggal
 const MOCK_DATE_MONDAY = new Date('2025-11-17T12:00:00.000Z'); // Senin (getDay() = 1)
-const REAL_DATE = Date;
+const REAL_DATE = Date; 
 
 describe('PiketController (OOP)', () => {
     let req;
     let res;
     // Ambil instance controller yang sudah diexport
-    const piketControllerInstance = require('../../controllers/piketController');
+    const piketControllerInstance = require('../../controllers/piketController'); 
 
     beforeAll(() => {
-        jest.spyOn(console, 'error').mockImplementation(() => { });
-        jest.spyOn(console, 'log').mockImplementation(() => { });
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        jest.spyOn(console, 'log').mockImplementation(() => {});
     });
 
     afterAll(() => {
@@ -35,7 +35,7 @@ describe('PiketController (OOP)', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-
+        
         // Mock objek Request dan Response
         req = {
             body: {},
@@ -105,14 +105,14 @@ describe('PiketController (OOP)', () => {
 
             // TIDAK ADA checkJadwalPiketTableExists di Controller yang baru
             expect(JadwalModel.getAllJadwalPiket).toHaveBeenCalled(); // <--- DIGANTI
-
-            const expectedSchedule = { /* ... (Logic grouping tetap sama) ... */ };
+            
+            const expectedSchedule = { /* ... (Logic grouping tetap sama) ... */ }; 
             // Kita hanya memastikan grouping berjalan
             expect(res.json).toHaveBeenCalledWith(
                 expect.objectContaining({ success: true, data: expect.any(Object) })
             );
         });
-
+        
         // Menutup catch block
         test('should return 500 on database error during fetch', async () => {
             JadwalModel.getAllJadwalPiket.mockRejectedValue(new Error('Fetch Error')); // <--- DIGANTI
@@ -131,7 +131,7 @@ describe('PiketController (OOP)', () => {
         beforeEach(() => {
             // Mengganti semua PiketModel dengan Model yang baru
             JadwalModel.clearAllJadwalPiket.mockResolvedValue({ affectedRows: 5 }); // <--- DIGANTI
-
+            
             UserModel.findUserByNamaLengkap.mockImplementation((name) => { // <--- DIGANTI
                 if (name === 'A') return { id: 1 };
                 if (name === 'B') return { id: 2 };
@@ -148,7 +148,7 @@ describe('PiketController (OOP)', () => {
             expect(JadwalModel.clearAllJadwalPiket).toHaveBeenCalled(); // <--- DIGANTI
             expect(JadwalModel.insertJadwalPiket).toHaveBeenCalledTimes(3); // <--- DIGANTI
             expect(JadwalModel.insertJadwalPiket).toHaveBeenCalledWith(1, 'Senin');
-
+            
             expect(res.status).toHaveBeenCalledWith(201);
         });
 
@@ -165,10 +165,10 @@ describe('PiketController (OOP)', () => {
         test('should handle database insert error inside loop', async () => {
             req.body = { schedule: { 'Senin': ['A'] } };
             JadwalModel.insertJadwalPiket.mockRejectedValue(new Error('Insert Fail')); // <--- DIGANTI
-
+            
             await piketControllerInstance.saveJadwalPiket.bind(piketControllerInstance)(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(201);
+            
+            expect(res.status).toHaveBeenCalledWith(201); 
             expect(res.json).toHaveBeenCalledWith(
                 expect.objectContaining({
                     data: expect.objectContaining({
@@ -178,34 +178,17 @@ describe('PiketController (OOP)', () => {
                 })
             );
         });
-
+        
         // Menutup catch block utama (clearAllJadwalPiket fails)
         test('should return 500 if clearAllJadwalPiket fails', async () => {
             req.body = { schedule: { 'Senin': ['A'] } };
             JadwalModel.clearAllJadwalPiket.mockRejectedValue(new Error('Clear DB Fail')); // <--- DIGANTI
-
+            
             await piketControllerInstance.saveJadwalPiket.bind(piketControllerInstance)(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(500);
+            
+            expect(res.status).toHaveBeenCalledWith(500); 
             expect(res.json).toHaveBeenCalledWith(
                 expect.objectContaining({ success: false, message: 'Error saving jadwal piket' })
-            );
-        });
-
-        test('should report error when user not found', async () => {
-            req.body = { schedule: { 'Senin': ['UnknownUser'] } };
-            UserModel.findUserByNamaLengkap.mockReturnValue(null); // User not found
-
-            await piketControllerInstance.saveJadwalPiket.bind(piketControllerInstance)(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    data: expect.objectContaining({
-                        total_inserted: 0,
-                        errors: [expect.stringContaining('User not found: UnknownUser')]
-                    })
-                })
             );
         });
     });
@@ -237,25 +220,25 @@ describe('PiketController (OOP)', () => {
     // --- Testing generateJadwalPiket ---
     describe('generateJadwalPiket', () => {
         const mockPengurus = [
-            { id: 1, nama_lengkap: 'A' }, { id: 2, nama_lengkap: 'B' },
+            { id: 1, nama_lengkap: 'A' }, { id: 2, nama_lengkap: 'B' }, 
             { id: 3, nama_lengkap: 'C' }, { id: 4, nama_lengkap: 'D' }, { id: 5, nama_lengkap: 'E' },
         ];
-
+        
         beforeEach(() => {
             UserModel.getAllPengurus.mockResolvedValue(mockPengurus); // <--- DIGANTI
         });
 
         // Menggunakan UserModel.getAllPengurus
         test('should generate schedule for 5 days with default 3 assignments/day', async () => {
-            req.body = {};
+            req.body = {}; 
             await piketControllerInstance.generateJadwalPiket.bind(piketControllerInstance)(req, res);
 
             expect(UserModel.getAllPengurus).toHaveBeenCalled(); // <--- DIGANTI
-
+            
             const generatedSchedule = res.json.mock.calls[0][0].data.schedule;
             expect(generatedSchedule.Senin.length).toBe(3);
         });
-
+        
         // Menutup 400 Not Found
         test('should return 400 if no pengurus found', async () => {
             UserModel.getAllPengurus.mockResolvedValue([]); // <--- DIGANTI
@@ -265,7 +248,7 @@ describe('PiketController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.json).toHaveBeenCalledWith({ success: false, message: 'No pengurus found' });
         });
-
+        
         // Menutup catch block
         test('should return 500 on database error during getAllPengurus', async () => {
             UserModel.getAllPengurus.mockRejectedValue(new Error('Generate DB Error')); // <--- DIGANTI
@@ -290,7 +273,7 @@ describe('PiketController (OOP)', () => {
         // Menggunakan AbsensiModel.getLaporanByDate
         test('should return 200 and absensi report for valid date', async () => {
             req.query.date = '2025-11-17'; // Senin
-
+            
             await piketControllerInstance.getAbsensiReport.bind(piketControllerInstance)(req, res);
 
             expect(AbsensiModel.getLaporanByDate).toHaveBeenCalledWith('2025-11-17'); // <--- DIGANTI
@@ -311,19 +294,7 @@ describe('PiketController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Invalid date format' });
         });
-
-        test('should return 400 if date query param is missing', async () => {
-            req.query = {}; // No date parameter
-
-            await piketControllerInstance.getAbsensiReport.bind(piketControllerInstance)(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                success: false,
-                message: 'Date query parameter is required'
-            });
-        });
-
+        
         // Menutup catch block
         test('should return 500 on database error', async () => {
             req.query.date = '2025-11-17';

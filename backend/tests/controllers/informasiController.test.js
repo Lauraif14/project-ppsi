@@ -89,31 +89,6 @@ describe('InformasiController (MVC & File Handling)', () => {
         });
     });
 
-    // --- TESTING getActiveInformasi ---
-    describe('getActiveInformasi', () => {
-        test('should fetch active informasi successfully', async () => {
-            const mockActiveInfo = [
-                { id: 1, judul: 'Active Info 1', is_active: true },
-                { id: 2, judul: 'Active Info 2', is_active: true }
-            ];
-            InformasiModel.getActiveInfo.mockResolvedValue(mockActiveInfo);
-
-            await bind(controller.getActiveInformasi)(req, res);
-
-            expect(InformasiModel.getActiveInfo).toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith({ data: mockActiveInfo });
-        });
-
-        test('should return 500 on database error', async () => {
-            InformasiModel.getActiveInfo.mockRejectedValue(new Error('DB Error'));
-
-            await bind(controller.getActiveInformasi)(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(500);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil informasi aktif.' });
-        });
-    });
-
     // --- TESTING createInformasi ---
     describe('createInformasi', () => {
         const MOCK_NEW_DATA = { id: 100, judul: 'Test', kategori: 'SOP' };

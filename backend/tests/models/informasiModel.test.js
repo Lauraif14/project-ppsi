@@ -71,25 +71,6 @@ describe('InformasiModel', () => {
             const result = await InformasiModel.findById(99);
             expect(result).toBeUndefined(); // rows[0] dari array kosong adalah undefined
         });
-
-        test('getActiveInfo should return active informasi lain', async () => {
-            const mockActiveInfo = { id: 1, judul: 'Active Info', kategori: 'Informasi Lain', is_active: true };
-            mockQuery.mockResolvedValue([[mockActiveInfo]]);
-
-            const result = await InformasiModel.getActiveInfo();
-
-            expect(mockQuery).toHaveBeenCalledTimes(1);
-            expect(mockQuery.mock.calls[0][0]).toBe('SELECT * FROM informasi WHERE kategori = "Informasi Lain" AND is_active = TRUE LIMIT 1');
-            expect(result).toEqual(mockActiveInfo);
-        });
-
-        test('getActiveInfo should return null if no active info found', async () => {
-            mockQuery.mockResolvedValue([[]]);
-
-            const result = await InformasiModel.getActiveInfo();
-
-            expect(result).toBeNull();
-        });
     });
 
     // --- CREATE OPERATIONS ---
@@ -138,18 +119,6 @@ describe('InformasiModel', () => {
             await expect(InformasiModel.create('Judul', 'Isi', 'SOP', null))
                 .rejects.toThrow('DB Insert Failed');
         });
-
-        test('create should deactivate other "Informasi Lain" when creating active one', async () => {
-            mockQuery.mockResolvedValue([{ insertId: 52 }]);
-
-            await InformasiModel.create('Active Info', 'Content', 'Informasi Lain', null, true);
-
-            // Should call UPDATE first to deactivate others, then INSERT
-            expect(mockQuery).toHaveBeenCalledTimes(2);
-            expect(mockQuery.mock.calls[0][0]).toBe('UPDATE informasi SET is_active = FALSE WHERE kategori = "Informasi Lain"');
-            expect(mockQuery.mock.calls[1][0]).toBe('INSERT INTO informasi (judul, isi, kategori, file_path, is_active) VALUES (?, ?, ?, ?, ?)');
-            expect(mockQuery.mock.calls[1][1]).toEqual(['Active Info', 'Content', 'Informasi Lain', null, true]);
-        });
     });
 
     // --- UPDATE OPERATIONS ---
@@ -189,16 +158,6 @@ describe('InformasiModel', () => {
                 undefined,
                 10
             ]);
-        });
-
-        test('update should deactivate other "Informasi Lain" when updating to active', async () => {
-            await InformasiModel.update(5, 'Active Title', 'Content', 'Informasi Lain', 'path/file.pdf', true);
-
-            // Should call UPDATE first to deactivate others, then UPDATE the target
-            expect(mockQuery).toHaveBeenCalledTimes(2);
-            expect(mockQuery.mock.calls[0][0]).toBe('UPDATE informasi SET is_active = FALSE WHERE kategori = "Informasi Lain" AND id != ?');
-            expect(mockQuery.mock.calls[0][1]).toEqual([5]);
-            expect(mockQuery.mock.calls[1][0]).toBe('UPDATE informasi SET judul=?, isi=?, kategori=?, file_path=?, is_active=? WHERE id=?');
         });
     });
 

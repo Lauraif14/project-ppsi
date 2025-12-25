@@ -17,6 +17,7 @@ const Navbar = () => {
             {/* Branding */}
             <div className="font-black text-xl tracking-tighter flex items-center gap-2 select-none">
                 <span className="text-pink-600 text-3xl">BESTI</span>
+                <span className="text-gray-900 text-xs bg-gray-100 px-2 py-1 rounded border-2 border-black font-bold">PANEL USER</span>
             </div>
 
             <button
