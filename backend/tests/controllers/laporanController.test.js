@@ -198,8 +198,107 @@ describe('LaporanController', () => {
             expect(console.error).toHaveBeenCalledWith('Error Laporan Inventaris:', expect.any(Error));
         });
 
-        test.skip('should handle invalid JSON in inventaris_checklist gracefully', async () => {
-            // Skipped: Controller implementation may handle this differently
+        test('should handle invalid JSON in inventaris_checklist and log error', async () => {
+            req.query = { tanggal: '2025-12-09' };
+            console.error.mockClear();
+
+            LaporanModel.getInventarisStatus.mockResolvedValue([
+                { id: 1, nama_barang: 'Item 1', status: 'Baik' }
+            ]);
+
+            // Mock data with invalid JSON string
+            LaporanModel.getInventarisChecklistReport.mockResolvedValue([
+                {
+                    id: 1,
+                    nama_lengkap: 'User A',
+                    waktu_masuk: '2025-12-09 08:00:00',
+                    inventaris_checklist: 'invalid json {{{' // Invalid JSON
+                }
+            ]);
+
+            await laporanController.getInventarisLaporanByDate(req, res);
+
+            expect(console.error).toHaveBeenCalledWith('Error parsing checklist JSON:', expect.any(Error));
+            expect(res.json).toHaveBeenCalled();
+        });
+
+        test('should process checklist array and update itemStatusMap by ID', async () => {
+            req.query = { tanggal: '2025-12-09' };
+
+            LaporanModel.getInventarisStatus.mockResolvedValue([
+                { id: 1, nama_barang: 'Kursi', status: 'Baik' },
+                { id: 2, nama_barang: 'Meja', status: 'Tersedia' }
+            ]);
+
+            // Mock checklist with array of items
+            LaporanModel.getInventarisChecklistReport.mockResolvedValue([
+                {
+                    id: 1,
+                    nama_lengkap: 'User A',
+                    waktu_masuk: '2025-12-09 08:00:00',
+                    inventaris_checklist: [
+                        { id: 1, condition: 'Rusak' },
+                        { id: 2, status: 'Dipinjam' }
+                    ]
+                }
+            ]);
+
+            await laporanController.getInventarisLaporanByDate(req, res);
+
+            expect(res.json).toHaveBeenCalled();
+            const response = res.json.mock.calls[0][0];
+            expect(response).toBeInstanceOf(Array);
+            expect(response.length).toBe(2);
+        });
+
+        test('should use itemName fallback when ID is not available', async () => {
+            req.query = { tanggal: '2025-12-09' };
+
+            LaporanModel.getInventarisStatus.mockResolvedValue([
+                { id: 1, nama_barang: 'Kursi', status: 'Baik' }
+            ]);
+
+            // Mock checklist with items using nama/item/nama_barang instead of id
+            LaporanModel.getInventarisChecklistReport.mockResolvedValue([
+                {
+                    id: 1,
+                    nama_lengkap: 'User A',
+                    waktu_masuk: '2025-12-09 08:00:00',
+                    inventaris_checklist: [
+                        { nama: 'Kursi', condition: 'Rusak' }
+                    ]
+                }
+            ]);
+
+            await laporanController.getInventarisLaporanByDate(req, res);
+
+            expect(res.json).toHaveBeenCalled();
+            const response = res.json.mock.calls[0][0];
+            expect(response[0].status).toBe('Rusak');
+        });
+
+        test('should handle items without history (not checked today)', async () => {
+            req.query = { tanggal: '2025-12-09' };
+
+            LaporanModel.getInventarisStatus.mockResolvedValue([
+                { id: 1, nama_barang: 'Kursi', status: 'Baik' },
+                { id: 2, nama_barang: 'Meja', status: 'Tersedia' }
+            ]);
+
+            // Empty checklist - no items checked
+            LaporanModel.getInventarisChecklistReport.mockResolvedValue([]);
+
+            await laporanController.getInventarisLaporanByDate(req, res);
+
+            expect(res.json).toHaveBeenCalled();
+            const response = res.json.mock.calls[0][0];
+            expect(response.length).toBe(2);
+            expect(response[0]).toHaveProperty('keterangan_laporan');
+            expect(response[0]).toHaveProperty('status_cek', 'not_checked');
+        });
+
+        test('should handle invalid JSON in inventaris_checklist gracefully', async () => {
+            // Controller menangani invalid JSON dengan console.error dan return (graceful handling)
             req.query = { tanggal: '2025-12-09' };
             const invalidData = [
                 {
@@ -212,15 +311,173 @@ describe('LaporanController', () => {
 
             // Mock master items
             LaporanModel.getInventarisStatus.mockResolvedValue([
-                { id: 1, nama: 'Item 1', status: 'Baik' }
+                { id: 1, nama_barang: 'Item 1', kode_barang: 'A001', status: 'Baik' }
             ]);
 
             LaporanModel.getInventarisChecklistReport.mockResolvedValue(invalidData);
 
             await laporanController.getInventarisLaporanByDate(req, res);
 
+            // Controller menangani dengan graceful - log error tapi tetap return 200
+            expect(console.error).toHaveBeenCalledWith('Error parsing checklist JSON:', expect.any(Error));
+            expect(res.json).toHaveBeenCalled();
+            // Masih return data master items
+            const response = res.json.mock.calls[0][0];
+            expect(response.length).toBe(1);
+        });
+    });
+
+    describe('getWeeklyPiketReport', () => {
+        const mockWeeklyData = [
+            {
+                user_id: 1,
+                nama_lengkap: 'User A',
+                divisi: 'IT',
+                jabatan: 'Staff',
+                total_jadwal: 5,
+                total_selesai: 4,
+                total_tidak_selesai: 1,
+                total_tidak_piket: 0
+            },
+            {
+                user_id: 2,
+                nama_lengkap: 'User B',
+                divisi: 'HR',
+                jabatan: 'Manager',
+                total_jadwal: 3,
+                total_selesai: 2,
+                total_tidak_selesai: 0,
+                total_tidak_piket: 1
+            }
+        ];
+
+        test('should return 400 if startDate or endDate is missing', async () => {
+            req.query = {};
+            await laporanController.getWeeklyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith({ message: 'startDate dan endDate diperlukan' });
+        });
+
+        test('should return 400 if only startDate is provided', async () => {
+            req.query = { startDate: '2025-12-01' };
+            await laporanController.getWeeklyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should return 400 if only endDate is provided', async () => {
+            req.query = { endDate: '2025-12-09' };
+            await laporanController.getWeeklyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should return weekly piket report with summary', async () => {
+            req.query = { startDate: '2025-12-01', endDate: '2025-12-07' };
+            LaporanModel.getWeeklyPiketReport.mockResolvedValue(mockWeeklyData);
+
+            await laporanController.getWeeklyPiketReport(req, res);
+
+            expect(LaporanModel.getWeeklyPiketReport).toHaveBeenCalledWith('2025-12-01', '2025-12-07');
+            expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                period: { startDate: '2025-12-01', endDate: '2025-12-07' },
+                data: mockWeeklyData,
+                summary: {
+                    total_pengurus: 2,
+                    total_jadwal: 8,
+                    total_selesai: 6,
+                    total_tidak_selesai: 1,
+                    total_tidak_piket: 1
+                }
+            });
+        });
+
+        test('should return 500 on database error', async () => {
+            req.query = { startDate: '2025-12-01', endDate: '2025-12-07' };
+            console.error.mockClear();
+            LaporanModel.getWeeklyPiketReport.mockRejectedValue(new Error('DB Error'));
+
+            await laporanController.getWeeklyPiketReport(req, res);
+
             expect(res.status).toHaveBeenCalledWith(500);
-            expect(console.error).toHaveBeenCalledWith('Error Laporan Inventaris:', expect.any(Error));
+            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil laporan piket mingguan' });
+            expect(console.error).toHaveBeenCalledWith('Error Weekly Piket Report:', expect.any(Error));
+        });
+    });
+
+    describe('getMonthlyPiketReport', () => {
+        const mockMonthlyData = [
+            {
+                user_id: 1,
+                nama_lengkap: 'User A',
+                divisi: 'IT',
+                jabatan: 'Staff',
+                total_jadwal: 20,
+                total_selesai: 18,
+                total_tidak_selesai: 2,
+                total_tidak_piket: 0
+            },
+            {
+                user_id: 2,
+                nama_lengkap: 'User B',
+                divisi: 'HR',
+                jabatan: 'Manager',
+                total_jadwal: 15,
+                total_selesai: 14,
+                total_tidak_selesai: 0,
+                total_tidak_piket: 1
+            }
+        ];
+
+        test('should return 400 if year or month is missing', async () => {
+            req.query = {};
+            await laporanController.getMonthlyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith({ message: 'year dan month diperlukan' });
+        });
+
+        test('should return 400 if only year is provided', async () => {
+            req.query = { year: '2025' };
+            await laporanController.getMonthlyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should return 400 if only month is provided', async () => {
+            req.query = { month: '12' };
+            await laporanController.getMonthlyPiketReport(req, res);
+            expect(res.status).toHaveBeenCalledWith(400);
+        });
+
+        test('should return monthly piket report with summary', async () => {
+            req.query = { year: '2025', month: '12' };
+            LaporanModel.getMonthlyPiketReport.mockResolvedValue(mockMonthlyData);
+
+            await laporanController.getMonthlyPiketReport(req, res);
+
+            expect(LaporanModel.getMonthlyPiketReport).toHaveBeenCalledWith(2025, 12);
+            expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                period: { year: 2025, month: 12 },
+                data: mockMonthlyData,
+                summary: {
+                    total_pengurus: 2,
+                    total_jadwal: 35,
+                    total_selesai: 32,
+                    total_tidak_selesai: 2,
+                    total_tidak_piket: 1
+                }
+            });
+        });
+
+        test('should return 500 on database error', async () => {
+            req.query = { year: '2025', month: '12' };
+            console.error.mockClear();
+            LaporanModel.getMonthlyPiketReport.mockRejectedValue(new Error('DB Error'));
+
+            await laporanController.getMonthlyPiketReport(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil laporan piket bulanan' });
+            expect(console.error).toHaveBeenCalledWith('Error Monthly Piket Report:', expect.any(Error));
         });
     });
 });

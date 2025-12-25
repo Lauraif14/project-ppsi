@@ -178,6 +178,22 @@ describe('AbsensiController (OOP)', () => {
             expect(res.status).toHaveBeenCalledWith(400);
             expect(res.json).toHaveBeenCalledWith({ message: 'Anda sudah memiliki sesi absen yang aktif.' });
         });
+
+        // Test Kasus Gagal: User tidak dijadwalkan piket hari ini
+        test('should return 403 if user is not scheduled for today', async () => {
+            // Mock jadwal - user dengan ID 1 tidak ada dalam jadwal
+            JadwalModel.getJadwalByDate.mockResolvedValue([
+                { user_id: 2, tanggal: '2025-11-17', hari: 'Senin' }, // User lain
+                { user_id: 3, tanggal: '2025-11-17', hari: 'Senin' }
+            ]);
+
+            await absensiControllerInstance.absenMasuk.bind(absensiControllerInstance)(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+            expect(res.json).toHaveBeenCalledWith({
+                message: 'Anda tidak dijadwalkan piket hari ini. Hanya pengurus yang dijadwalkan yang dapat melakukan absensi.'
+            });
+        });
     });
 
     // --- Testing submitChecklist ---

@@ -235,5 +235,126 @@ describe('JadwalController - Date-based System', () => {
 
             expect(res.status).toHaveBeenCalledWith(500);
         });
+
+        test('should return 400 if no users available', async () => {
+            req.body = {
+                start_date: '2025-01-06',
+                end_date: '2025-01-10'
+            };
+
+            const db = require('../../db');
+            db.query = jest.fn().mockResolvedValue([[]]); // No users
+
+            await jadwalControllerInstance.generateJadwalByDateRange(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: expect.stringContaining('Tidak ada user yang tersedia')
+                })
+            );
+        });
+
+        test('should return 400 if no weekdays in range', async () => {
+            req.body = {
+                start_date: '2025-01-04', // Saturday
+                end_date: '2025-01-05'    // Sunday
+            };
+
+            const db = require('../../db');
+            db.query = jest.fn().mockResolvedValue([[
+                { id: 1, nama_lengkap: 'User A', divisi: 'IT' }
+            ]]);
+
+            await jadwalControllerInstance.generateJadwalByDateRange(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    message: 'Tidak ada hari kerja dalam range tanggal tersebut'
+                })
+            );
+        });
+    });
+
+    describe('saveJadwal - Duplicate Entry Handling', () => {
+        test('should skip duplicate entries and continue', async () => {
+            req.body = {
+                schedule: [
+                    { user_id: 1, tanggal: '2025-01-08', hari: 'Senin' },
+                    { user_id: 2, tanggal: '2025-01-09', hari: 'Selasa' }
+                ]
+            };
+
+            JadwalModel.deleteJadwalByDateRange.mockResolvedValue({ affectedRows: 0 });
+
+            // First insert succeeds, second throws duplicate error
+            JadwalModel.insertJadwalByDate
+                .mockResolvedValueOnce()
+                .mockRejectedValueOnce({ code: 'ER_DUP_ENTRY' });
+
+            await jadwalControllerInstance.saveJadwal(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: true,
+                    data: expect.objectContaining({
+                        total_inserted: 1 // Only 1 inserted, 1 skipped
+                    })
+                })
+            );
+        });
+
+        test('should throw error if non-duplicate error occurs', async () => {
+            req.body = {
+                schedule: [
+                    { user_id: 1, tanggal: '2025-01-08', hari: 'Senin' }
+                ]
+            };
+
+            JadwalModel.deleteJadwalByDateRange.mockResolvedValue({ affectedRows: 0 });
+            JadwalModel.insertJadwalByDate.mockRejectedValue({ code: 'ER_OTHER_ERROR', message: 'Some error' });
+
+            await jadwalControllerInstance.saveJadwal(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+        });
+    });
+
+    describe('getJadwal - Grouping Logic', () => {
+        test('should group jadwal by date correctly', async () => {
+            const mockJadwal = [
+                { user_id: 1, nama_lengkap: 'User A', divisi: 'IT', tanggal: '2025-01-08', hari: 'Senin', avatar_url: null },
+                { user_id: 2, nama_lengkap: 'User B', divisi: 'HR', tanggal: '2025-01-08', hari: 'Senin', avatar_url: null },
+                { user_id: 3, nama_lengkap: 'User C', divisi: 'IT', tanggal: '2025-01-09', hari: 'Selasa', avatar_url: null }
+            ];
+
+            JadwalModel.getCurrentWeekSchedule.mockResolvedValue(mockJadwal);
+
+            await jadwalControllerInstance.getJadwal(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    success: true,
+                    data: expect.arrayContaining([
+                        expect.objectContaining({
+                            tanggal: '2025-01-08',
+                            hari: 'Senin',
+                            pengurus: expect.arrayContaining([
+                                expect.objectContaining({ user_id: 1 }),
+                                expect.objectContaining({ user_id: 2 })
+                            ])
+                        }),
+                        expect.objectContaining({
+                            tanggal: '2025-01-09',
+                            hari: 'Selasa',
+                            pengurus: expect.arrayContaining([
+                                expect.objectContaining({ user_id: 3 })
+                            ])
+                        })
+                    ])
+                })
+            );
+        });
     });
 });
