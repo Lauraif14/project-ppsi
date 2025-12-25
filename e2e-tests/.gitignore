@@ -1,0 +1,30 @@
+# Ignore dependencies
+node_modules/
+
+# Ignore test artifacts
+screenshots/
+fixtures/*.jpg
+fixtures/*.png
+fixtures/*.txt
+
+# Ignore environment variables
+.env
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Ignore coverage
+coverage/
+*.lcov
