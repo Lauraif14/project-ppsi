@@ -36,10 +36,10 @@ const AbsensiModel = {
     },
 
     // Mengupdate checklist inventaris
-    updateChecklist: async (absensiId, userId, checklistJson) => {
+    updateChecklist: async (absensiId, userId, checklistJson, note = '') => {
         await db.query(
-            'UPDATE absensi SET inventaris_checklist = ?, checklist_submitted = TRUE WHERE id = ? AND user_id = ?',
-            [checklistJson, absensiId, userId]
+            'UPDATE absensi SET inventaris_checklist = ?, checklist_submitted = TRUE, note = ? WHERE id = ? AND user_id = ?',
+            [checklistJson, note, absensiId, userId]
         );
     },
 

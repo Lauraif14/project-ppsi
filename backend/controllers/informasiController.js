@@ -24,6 +24,8 @@ class InformasiController {
     }
   };
 
+
+
   // Buat Data Baru (Handle File & Teks)
   createInformasi = async (req, res) => {
     try {

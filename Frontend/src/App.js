@@ -29,6 +29,7 @@ function AnimatedRoutes() {
         {/* --- Rute Terproteksi untuk User Biasa & Admin --- */}
         <Route element={<ProtectedRoute allowedRoles={['user', 'admin']} />}>
           <Route path="/user-dashboard" element={<DashboardUser />} />
+          <Route path="/profile" element={<SettingsProfile />} />
         </Route>
 
         {/* --- Rute Terproteksi HANYA untuk Admin --- */}
@@ -38,7 +39,7 @@ function AnimatedRoutes() {
           <Route path="/jadwal-piket" element={<JadwalPiketPage />} />
           <Route path="/informasi-piket" element={<InformationPage />} />
           <Route path="/laporan" element={<LaporanPage />} />
-          <Route path="/profile" element={<SettingsProfile />} />
+
         </Route>
       </Routes>
     </AnimatePresence>

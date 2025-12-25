@@ -27,6 +27,18 @@ class InformasiModel {
         return rows[0] || null;
     }
 
+    // Mengambil semua SOP, Panduan, dan Informasi Lain yang AKTIF saja (Kombinasi)
+    async getDashboardInfo() {
+        const sql = `
+            SELECT * FROM informasi 
+            WHERE kategori IN ('SOP', 'Panduan') 
+            OR (kategori = 'Informasi Lain' AND is_active = 1)
+            ORDER BY FIELD(kategori, "SOP", "Panduan", "Informasi Lain"), created_at DESC
+        `;
+        const [rows] = await this.db.query(sql);
+        return rows;
+    }
+
     async findById(id) {
         const [rows] = await this.db.query('SELECT * FROM informasi WHERE id = ?', [id]);
         return rows[0];

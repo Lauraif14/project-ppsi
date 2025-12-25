@@ -44,7 +44,7 @@ const startScheduledCleanup = () => {
         });
     }, 24 * 60 * 60 * 1000);
 
-    console.log('[Jadwal Cleanup] Scheduled cleanup started (runs every 24 hours)');
+
 };
 
 module.exports = {

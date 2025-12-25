@@ -3,7 +3,7 @@
 import axios from "axios";
 
 // URL Backend (bisa dari .env atau default localhost)
-export const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+export const BASE_URL = process.env.REACT_APP_BACKEND_URL || "https://besti.app";
 
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,

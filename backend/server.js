@@ -12,6 +12,7 @@ const jadwalRoutes = require('./routes/jadwalRoutes');
 const informasiRoutes = require('./routes/informasiRoutes');
 const laporanRoutes = require('./routes/laporanRoutes');
 const { startScheduledCleanup } = require('./utils/jadwalCleanup');
+const { startAbsensiAutoClose } = require('./utils/absensiAutoClose');
 
 const app = express();
 app.use(cors()); // Izinkan request dari domain lain (React app Anda)
@@ -32,4 +33,6 @@ app.listen(PORT, () => {
     console.log(`Server berjalan di port ${PORT}`);
     // Start scheduled cleanup untuk jadwal piket yang sudah lewat
     startScheduledCleanup();
+    // Start scheduled auto-close untuk absensi yang lupa keluar
+    startAbsensiAutoClose();
 });
