@@ -1,0 +1,34 @@
+{
+  "name": "e2e-tests-ppsi",
+  "version": "1.0.0",
+  "description": "E2E Testing untuk Sistem Piket Sekretariat Informatika",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:functional": "playwright test tests/functional",
+    "test:performance": "playwright test tests/non-functional/performance",
+    "test:compatibility": "playwright test tests/non-functional/compatibility",
+    "test:chrome": "playwright test --project='Chrome Latest'",
+    "test:firefox": "playwright test --project='Firefox Latest'",
+    "test:safari": "playwright test --project='Safari Latest'",
+    "test:edge": "playwright test --project='Edge Latest'",
+    "test:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'",
+    "test:all-browsers": "playwright test --project=\"Chrome Latest\" --project=\"Firefox Latest\" --project=\"Safari Latest\" --project=\"Edge Latest\" --project=\"Mobile Chrome\" --project=\"Mobile Safari\" --project=\"iPad\" --project=\"Galaxy S21\"",
+    "report": "playwright show-report reports/playwright-report",
+    "install:browsers": "playwright install"
+  },
+  "keywords": [
+    "e2e",
+    "testing",
+    "playwright",
+    "ppsi"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
