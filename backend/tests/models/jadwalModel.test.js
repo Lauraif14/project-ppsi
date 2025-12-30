@@ -172,4 +172,66 @@ describe('JadwalModel - Date-based System', () => {
             expect(result).toEqual(mockAbsensi);
         });
     });
+
+    describe('Legacy Methods (Backward Compatibility)', () => {
+
+        test('getAllJadwalPiket should fetch current week schedule by day order', async () => {
+            const mockRows = [{ id: 1, hari: 'Senin', user_id: 101 }];
+            mockQuery.mockResolvedValue([mockRows]);
+
+            const result = await JadwalModel.getAllJadwalPiket();
+
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringMatching(/ORDER BY FIELD/));
+            expect(result).toEqual(mockRows);
+        });
+
+        test('clearAllJadwalPiket should delete all jadwal', async () => {
+            mockQuery.mockResolvedValue([{ affectedRows: 10 }]);
+            await JadwalModel.clearAllJadwalPiket();
+            expect(mockQuery).toHaveBeenCalledWith('DELETE FROM jadwal_piket');
+        });
+
+        test('getScheduledUsersByDay should fetch by hari', async () => {
+            mockQuery.mockResolvedValue([[{ id: 1 }]]);
+            await JadwalModel.getScheduledUsersByDay('Senin');
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE jp.hari = ?'), ['Senin']);
+        });
+
+        describe('insertJadwalPiket', () => {
+            beforeEach(() => {
+                // Set fixed date: Wednesday, 2025-01-08
+                jest.useFakeTimers();
+                jest.setSystemTime(new Date('2025-01-08T12:00:00.000Z'));
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            test('should calculate correct date for Senin (Day 1)', async () => {
+                // Current is Wed (8th). Monday was 6th.
+                mockQuery.mockResolvedValue([{}]);
+
+                await JadwalModel.insertJadwalPiket(101, 'Senin');
+
+                expect(mockQuery).toHaveBeenCalledTimes(1);
+                // Expect date to be 2025-01-06
+                expect(mockQuery.mock.calls[0][1]).toEqual([101, '2025-01-06', 'Senin']);
+            });
+
+            test('should calculate correct date for Jumat (Day 5)', async () => {
+                // Current is Wed (8th). Friday is 10th.
+                mockQuery.mockResolvedValue([{}]);
+
+                await JadwalModel.insertJadwalPiket(102, 'Jumat');
+
+                expect(mockQuery.mock.calls[0][1]).toEqual([102, '2025-01-10', 'Jumat']);
+            });
+
+            test('should throw error for invalid day', async () => {
+                await expect(JadwalModel.insertJadwalPiket(103, 'Minggu'))
+                    .rejects.toThrow('Invalid hari: Minggu');
+            });
+        });
+    });
 });

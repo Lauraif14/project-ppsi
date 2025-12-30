@@ -207,6 +207,26 @@ describe('UserModel', () => {
             expect(mockExecute.mock.calls[0][0]).toBe('UPDATE users SET nama_lengkap = ?, email = ?, jabatan = ?, divisi = ?, role = ? WHERE id = ?');
         });
 
+        test('updateUser should handle username field update', async () => {
+            const dataWithUsername = { username: 'newusername', email: 'test@mail.com' };
+            mockExecute.mockResolvedValue([{}]);
+
+            await UserModel.updateUser(5, dataWithUsername);
+
+            expect(mockExecute).toHaveBeenCalledTimes(1);
+            expect(mockExecute.mock.calls[0][0]).toBe('UPDATE users SET username = ?, email = ? WHERE id = ?');
+            expect(mockExecute.mock.calls[0][1]).toEqual(['newusername', 'test@mail.com', 5]);
+        });
+
+        test('updateUser should return early if no fields to update', async () => {
+            mockExecute.mockResolvedValue([{}]);
+
+            await UserModel.updateUser(5, {});
+
+            // Should not call db.execute because fields.length === 0
+            expect(mockExecute).not.toHaveBeenCalled();
+        });
+
         test('updateProfile should update nama_lengkap and email', async () => {
             mockQuery.mockResolvedValue([{}]);
             await UserModel.updateProfile('New Name', 'new@mail.com', 10);

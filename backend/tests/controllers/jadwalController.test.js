@@ -2,8 +2,10 @@
 
 const jadwalControllerInstance = require('../../controllers/jadwalController');
 const JadwalModel = require('../../models/jadwalModel');
+const db = require('../../db');
 
 jest.mock('../../models/jadwalModel');
+jest.mock('../../db');
 
 describe('JadwalController - Date-based System', () => {
     let req;
@@ -13,6 +15,9 @@ describe('JadwalController - Date-based System', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+
+        // Default db mock
+        db.query.mockResolvedValue([[]]);
 
         req = {
             protocol: 'http',
@@ -120,6 +125,38 @@ describe('JadwalController - Date-based System', () => {
 
             expect(res.status).toHaveBeenCalledWith(500);
         });
+
+        test('should merge jadwal with absensi data correctly', async () => {
+            req.query = { start_date: '2025-01-08', end_date: '2025-01-08' };
+
+            // 1. Mock Schedule: User A scheduled
+            const mockSchedule = [{ user_id: 1, tanggal: '2025-01-08', hari: 'Rabu', nama_lengkap: 'User A' }];
+            JadwalModel.getJadwalByDateRange.mockResolvedValue(mockSchedule);
+
+            // 2. Mock Absensi: User A (Present), User B (Not Scheduled but Present)
+            const mockAbsensi = [
+                { user_id: 1, tanggal: '2025-01-08', waktu_masuk: '2025-01-08 08:00', waktu_keluar: null },
+                { user_id: 2, tanggal: '2025-01-08', waktu_masuk: '2025-01-08 09:00', waktu_keluar: '2025-01-08 17:00', nama_lengkap: 'User B' }
+            ];
+            db.query.mockResolvedValueOnce([mockAbsensi]);
+
+            await jadwalControllerInstance.getJadwal(req, res);
+
+            // Verify response structure
+            const responseData = res.json.mock.calls[0][0].data;
+            expect(responseData.length).toBe(1); // One date group
+            const pengurus = responseData[0].pengurus;
+
+            // User A: Scheduled & Present (status: sedang)
+            const userA = pengurus.find(p => p.user_id === 1);
+            expect(userA).toBeDefined();
+            expect(userA.status).toBe('sedang');
+
+            // User B: Not Scheduled but Present (status: sudah)
+            const userB = pengurus.find(p => p.user_id === 2);
+            expect(userB).toBeDefined();
+            expect(userB.status).toBe('sudah');
+        });
     });
 
     describe('saveJadwal', () => {
@@ -158,6 +195,36 @@ describe('JadwalController - Date-based System', () => {
             await jadwalControllerInstance.saveJadwal(req, res);
 
             expect(res.status).toHaveBeenCalledWith(500);
+        });
+
+        test('should ignore ER_DUP_ENTRY error', async () => {
+            req.body = {
+                schedule: [
+                    { user_id: 1, tanggal: '2025-01-08', hari: 'Senin' }
+                ]
+            };
+            JadwalModel.deleteJadwalByDateRange.mockResolvedValue({ affectedRows: 0 });
+
+            const dupError = new Error('Duplicate');
+            dupError.code = 'ER_DUP_ENTRY';
+            JadwalModel.insertJadwalByDate.mockRejectedValue(dupError);
+
+            await jadwalControllerInstance.saveJadwal(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ success: true, data: expect.objectContaining({ total_inserted: 0 }) })
+            );
+        });
+
+        test('should throw error if non-duplicate error occurs', async () => {
+            req.body = { schedule: [{ user_id: 1, tanggal: '2025-01-08', hari: 'Senin' }] };
+            JadwalModel.deleteJadwalByDateRange.mockResolvedValue({ affectedRows: 0 });
+            JadwalModel.insertJadwalByDate.mockRejectedValue(new Error('Fatal DB Error'));
+
+            await jadwalControllerInstance.saveJadwal(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Gagal menyimpan jadwal') }));
         });
     });
 
@@ -234,6 +301,28 @@ describe('JadwalController - Date-based System', () => {
             await jadwalControllerInstance.generateJadwalByDateRange(req, res);
 
             expect(res.status).toHaveBeenCalledWith(500);
+        });
+
+        test('should return 400 if no users available', async () => {
+            req.body = { start_date: '2025-01-06', end_date: '2025-01-10' };
+            const db = require('../../db');
+            db.query = jest.fn().mockResolvedValueOnce([[]]); // No users
+
+            await jadwalControllerInstance.generateJadwalByDateRange(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Tidak ada user') }));
+        });
+
+        test('should return 400 if no weekdays in range', async () => {
+            req.body = { start_date: '2025-01-04', end_date: '2025-01-05' }; // Sat-Sun
+            const db = require('../../db');
+            db.query = jest.fn().mockResolvedValueOnce([[{ id: 1, nama_lengkap: 'A' }]]);
+
+            await jadwalControllerInstance.generateJadwalByDateRange(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(400);
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Tidak ada hari kerja') }));
         });
     });
 });
