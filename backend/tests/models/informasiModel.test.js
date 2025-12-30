@@ -71,6 +71,21 @@ describe('InformasiModel', () => {
             const result = await InformasiModel.findById(99);
             expect(result).toBeUndefined(); // rows[0] dari array kosong adalah undefined
         });
+
+        test('getActiveInfo should select active info of type Informasi Lain', async () => {
+            const mockRows = [{ id: 1, judul: 'Active Info', is_active: true }];
+            mockQuery.mockResolvedValue([mockRows]);
+            const result = await InformasiModel.getActiveInfo();
+            expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('WHERE kategori = "Informasi Lain" AND is_active = TRUE'));
+            expect(result).toEqual(mockRows[0]);
+        });
+
+        test('getDashboardInfo should select SOP, Panduan, and active Informasi Lain', async () => {
+            await InformasiModel.getDashboardInfo();
+            const sql = mockQuery.mock.calls[0][0].replace(/\s+/g, ' ');
+            expect(sql).toContain("kategori IN ('SOP', 'Panduan')");
+            expect(sql).toContain("kategori = 'Informasi Lain' AND is_active = 1");
+        });
     });
 
     // --- CREATE OPERATIONS ---
@@ -119,6 +134,20 @@ describe('InformasiModel', () => {
             await expect(InformasiModel.create('Judul', 'Isi', 'SOP', null))
                 .rejects.toThrow('DB Insert Failed');
         });
+
+        test('create should deactivate other Informasi Lain if is_active is true', async () => {
+            mockQuery.mockResolvedValue([{ insertId: 1 }]);
+            await InformasiModel.create('J', 'I', 'Informasi Lain', null, true);
+
+            // Should call UPDATE first
+            expect(mockQuery).toHaveBeenNthCalledWith(1,
+                expect.stringContaining('UPDATE informasi SET is_active = FALSE')
+            );
+            // Then INSERT
+            expect(mockQuery).toHaveBeenNthCalledWith(2,
+                expect.stringContaining('INSERT INTO'), expect.anything()
+            );
+        });
     });
 
     // --- UPDATE OPERATIONS ---
@@ -158,6 +187,20 @@ describe('InformasiModel', () => {
                 undefined,
                 10
             ]);
+        });
+
+        test('update should deactivate other Informasi Lain if is_active is true', async () => {
+            await InformasiModel.update(1, 'J', 'I', 'Informasi Lain', 'file', true);
+
+            // Should call UPDATE first (deactivate others)
+            expect(mockQuery).toHaveBeenNthCalledWith(1,
+                expect.stringContaining('UPDATE informasi SET is_active = FALSE'),
+                expect.anything()
+            );
+            // Then UPDATE target
+            expect(mockQuery).toHaveBeenNthCalledWith(2,
+                expect.stringContaining('UPDATE informasi SET'), expect.anything()
+            );
         });
     });
 
