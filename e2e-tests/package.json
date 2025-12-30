@@ -1,0 +1,43 @@
+{
+  "name": "e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end testing dengan Selenium WebDriver",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:login": "playwright test tests/auth.test.js",
+    "test:user": "playwright test tests/user.test.js",
+    "test:absensi": "playwright test tests/absensi.test.js",
+    "test:jadwal": "playwright test tests/jadwal.test.js",
+    "test:laporan": "playwright test tests/laporan.test.js",
+    "test:informasi": "playwright test tests/informasi.test.js",
+    "test:report": "playwright show-report"
+  },
+  "keywords": [
+    "e2e",
+    "selenium",
+    "testing"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^16.4.5",
+    "geckodriver": "^4.3.3",
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 60000,
+    "setupFilesAfterEnv": [
+      "<rootDir>/config/jest.setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
+  }
+}
