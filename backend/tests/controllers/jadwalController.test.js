@@ -2,8 +2,10 @@
 
 const jadwalControllerInstance = require('../../controllers/jadwalController');
 const JadwalModel = require('../../models/jadwalModel');
+const db = require('../../db');
 
 jest.mock('../../models/jadwalModel');
+jest.mock('../../db');
 
 describe('JadwalController - Date-based System', () => {
     let req;
@@ -13,6 +15,9 @@ describe('JadwalController - Date-based System', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+
+        // Default db mock
+        db.query.mockResolvedValue([[]]);
 
         req = {
             protocol: 'http',

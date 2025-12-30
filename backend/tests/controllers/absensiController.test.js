@@ -300,6 +300,14 @@ describe('AbsensiController (OOP)', () => {
 
     // --- Testing getAbsensiStatus ---
     describe('getAbsensiStatus', () => {
+        beforeEach(() => {
+            global.Date = class extends REAL_DATE {
+                constructor(input) {
+                    return input ? new REAL_DATE(input) : MOCK_DATE;
+                }
+            };
+        });
+
         const TODAY_SESSION = { id: 10, waktu_masuk: MOCK_DATE.toISOString() };
         const YESTERDAY_SESSION = { id: 10, waktu_masuk: new Date(MOCK_DATE.getTime() - 86400000).toISOString() };
 
@@ -308,7 +316,13 @@ describe('AbsensiController (OOP)', () => {
 
             await absensiControllerInstance.getAbsensiStatus.bind(absensiControllerInstance)(req, res);
 
-            expect(res.json).toHaveBeenCalledWith(TODAY_SESSION);
+            expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                data: {
+                    ...TODAY_SESSION,
+                    status: 'sedang'
+                }
+            });
         });
 
         test('should return null if active session is not from today', async () => {
@@ -316,7 +330,14 @@ describe('AbsensiController (OOP)', () => {
 
             await absensiControllerInstance.getAbsensiStatus.bind(absensiControllerInstance)(req, res);
 
-            expect(res.json).toHaveBeenCalledWith(null);
+            // Implementation for stale session:
+            expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                data: {
+                    ...YESTERDAY_SESSION,
+                    status: 'tidak_lengkap'
+                }
+            });
         });
 
         // Test Gagal DB (Error 500) -> Menutup Baris 187
@@ -326,7 +347,7 @@ describe('AbsensiController (OOP)', () => {
             await absensiControllerInstance.getAbsensiStatus.bind(absensiControllerInstance)(req, res);
 
             expect(res.status).toHaveBeenCalledWith(500);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil status absensi.' });
+            expect(res.json).toHaveBeenCalledWith({ success: false, message: 'Gagal mengambil status absensi.' });
         });
     });
 

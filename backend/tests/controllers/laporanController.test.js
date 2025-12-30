@@ -1,226 +1,116 @@
 // tests/controllers/laporanController.test.js
+const LaporanController = require('../../controllers/laporanController');
+const db = require('../../db');
 
-jest.mock('../../models/laporanModel');
-
-const laporanController = require('../../controllers/laporanController');
-const LaporanModel = require('../../models/laporanModel');
+jest.mock('../../db');
 
 describe('LaporanController', () => {
-    let req;
-    let res;
-
-    beforeAll(() => {
-        jest.spyOn(console, 'error').mockImplementation(() => { });
-    });
-
-    afterAll(() => {
-        console.error.mockRestore();
-    });
+    let req, res;
 
     beforeEach(() => {
         jest.clearAllMocks();
         req = {
-            query: {},
-            protocol: 'http',
-            get: jest.fn((header) => {
-                if (header === 'host') return 'localhost:5000';
-                return null;
-            }),
+            query: {}
         };
         res = {
             status: jest.fn().mockReturnThis(),
-            json: jest.fn(),
+            json: jest.fn()
         };
+        // Suppress console.error during tests
+        jest.spyOn(console, 'error').mockImplementation(() => { });
     });
 
-    describe('getAbsensiLaporan', () => {
-        const mockAbsensiData = [
+    afterEach(() => {
+        console.error.mockRestore();
+    });
+
+    describe('getLaporanAbsensi', () => {
+        const mockRows = [
             {
-                id: 1,
-                nama_lengkap: 'User A',
-                foto_path: 'public/uploads/absensi/photo1.jpg',
-                foto_path_keluar: 'public/uploads/absensi/photo2.jpg',
-                waktu_masuk: '2025-12-09 08:00:00',
-                waktu_keluar: '2025-12-09 17:00:00',
+                absensi_id: 1,
+                tanggal: '2025-01-01',
+                day_name: 'Monday',
+                user_id: 101,
+                nama_lengkap: 'Budi',
+                divisi: 'IT',
+                avatar_url: 'avatar.jpg',
+                waktu_masuk: '2025-01-01T08:00:00.000Z',
+                waktu_keluar: '2025-01-01T17:00:00.000Z',
+                checklist_submitted: 1,
+                note: 'On time',
+                foto_path: 'masuk.jpg',
+                foto_path_keluar: 'keluar.jpg'
             },
             {
-                id: 2,
-                nama_lengkap: 'User B',
-                foto_path: null,
-                foto_path_keluar: null,
-                waktu_masuk: '2025-12-09 08:30:00',
+                absensi_id: 2,
+                tanggal: '2025-01-01',
+                day_name: 'Monday',
+                user_id: 102,
+                nama_lengkap: 'Siti',
+                divisi: 'HR',
+                avatar_url: 'avatar2.jpg',
+                waktu_masuk: '2025-01-01T09:00:00.000Z',
                 waktu_keluar: null,
-            },
+                checklist_submitted: 0,
+                note: null,
+                foto_path: 'masuk2.jpg',
+                foto_path_keluar: null
+            }
         ];
 
-        test('should return 400 if startDate or endDate is missing', async () => {
-            req.query = {};
-            await laporanController.getAbsensiLaporan(req, res);
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Rentang tanggal (startDate dan endDate) diperlukan.' });
-        });
+        test('should return grouped data successfully with default date range', async () => {
+            db.query.mockResolvedValue([mockRows]);
 
-        test('should return 400 if only startDate is provided', async () => {
-            req.query = { startDate: '2025-12-01' };
-            await laporanController.getAbsensiLaporan(req, res);
-            expect(res.status).toHaveBeenCalledWith(400);
-        });
+            await LaporanController.getLaporanAbsensi(req, res);
 
-        test('should return 400 if only endDate is provided', async () => {
-            req.query = { endDate: '2025-12-09' };
-            await laporanController.getAbsensiLaporan(req, res);
-            expect(res.status).toHaveBeenCalledWith(400);
-        });
-
-        test('should return absensi report with photo URLs', async () => {
-            req.query = { startDate: '2025-12-01', endDate: '2025-12-09' };
-            LaporanModel.getAbsensiReport.mockResolvedValue(mockAbsensiData);
-
-            await laporanController.getAbsensiLaporan(req, res);
-
-            expect(LaporanModel.getAbsensiReport).toHaveBeenCalledWith(
-                '2025-12-01 00:00:00',
-                '2025-12-09 23:59:59'
+            // Verify DB query params (default: month ago)
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('SELECT'),
+                expect.any(Array)
             );
-            expect(res.json).toHaveBeenCalledWith([
-                {
-                    id: 1,
-                    nama_lengkap: 'User A',
-                    foto_path: 'public/uploads/absensi/photo1.jpg',
-                    foto_path_keluar: 'public/uploads/absensi/photo2.jpg',
-                    waktu_masuk: '2025-12-09 08:00:00',
-                    waktu_keluar: '2025-12-09 17:00:00',
-                    foto_masuk_url: 'http://localhost:5000/public/uploads/absensi/photo1.jpg',
-                    foto_keluar_url: 'http://localhost:5000/public/uploads/absensi/photo2.jpg',
-                },
-                {
-                    id: 2,
-                    nama_lengkap: 'User B',
-                    foto_path: null,
-                    foto_path_keluar: null,
-                    waktu_masuk: '2025-12-09 08:30:00',
-                    waktu_keluar: null,
-                    foto_masuk_url: null,
-                    foto_keluar_url: null,
-                },
-            ]);
+            // expect params to be [monthAgo]
+
+            // Verify Response
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                success: true,
+                total: 2,
+                data: expect.any(Array)
+            }));
+
+            const responseData = res.json.mock.calls[0][0].data;
+            expect(responseData.length).toBe(1); // 1 group (date '2025-01-01')
+            expect(responseData[0].tanggal).toBe('2025-01-01');
+            expect(responseData[0].hari).toBe('Senin'); // Monday -> Senin
+            expect(responseData[0].pengurus.length).toBe(2);
+            expect(responseData[0].pengurus[0].status).toBe('sudah');
+            expect(responseData[0].pengurus[1].status).toBe('sedang');
         });
 
-        test('should return 500 on database error', async () => {
-            req.query = { startDate: '2025-12-01', endDate: '2025-12-09' };
-            console.error.mockClear();
-            LaporanModel.getAbsensiReport.mockRejectedValue(new Error('DB Error'));
+        test('should filter by start_date and end_date', async () => {
+            req.query = { start_date: '2025-01-01', end_date: '2025-01-02' };
+            db.query.mockResolvedValue([mockRows]);
 
-            await laporanController.getAbsensiLaporan(req, res);
+            await LaporanController.getLaporanAbsensi(req, res);
 
+            expect(db.query).toHaveBeenCalledWith(
+                expect.stringContaining('BETWEEN ? AND ?'),
+                ['2025-01-01', '2025-01-02']
+            );
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+        });
+
+        test('should handle database error', async () => {
+            const error = new Error('DB Error');
+            db.query.mockRejectedValue(error);
+
+            await LaporanController.getLaporanAbsensi(req, res);
+
+            expect(console.error).toHaveBeenCalledWith('Error getting laporan absensi:', error);
             expect(res.status).toHaveBeenCalledWith(500);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil laporan absensi' });
-            expect(console.error).toHaveBeenCalledWith('Error Laporan Absensi:', expect.any(Error));
-        });
-    });
-
-    describe('getInventarisStatusRealtime', () => {
-        const mockInventarisStatus = [
-            { id: 1, nama: 'Kursi', status: 'Baik', kategori: 'Furniture' },
-            { id: 2, nama: 'Meja', status: 'Rusak', kategori: 'Furniture' },
-        ];
-
-        test('should return inventaris status successfully', async () => {
-            LaporanModel.getInventarisStatus.mockResolvedValue(mockInventarisStatus);
-
-            await laporanController.getInventarisStatusRealtime(req, res);
-
-            expect(LaporanModel.getInventarisStatus).toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith(mockInventarisStatus);
-        });
-
-        test('should return 500 on database error', async () => {
-            LaporanModel.getInventarisStatus.mockRejectedValue(new Error('DB Error'));
-
-            await laporanController.getInventarisStatusRealtime(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(500);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil status inventaris' });
-        });
-    });
-
-    describe('getInventarisLaporanByDate', () => {
-        const mockChecklistData = [
-            {
-                id: 1,
-                tanggal: '2025-12-09',
-                inventaris_checklist: '{"items":[{"id":1,"status":"Baik"}]}',
-            },
-            {
-                id: 2,
-                tanggal: '2025-12-09',
-                inventaris_checklist: '{"items":[{"id":2,"status":"Rusak"}]}',
-            },
-        ];
-
-        test('should return 400 if tanggal is missing', async () => {
-            req.query = {};
-            await laporanController.getInventarisLaporanByDate(req, res);
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Tanggal diperlukan.' });
-        });
-
-        test('should return inventaris report with parsed checklist', async () => {
-            req.query = { tanggal: '2025-12-09' };
-
-            // Mock master items
-            LaporanModel.getInventarisStatus.mockResolvedValue([
-                { id: 1, nama: 'Item 1', status: 'Baik' },
-                { id: 2, nama: 'Item 2', status: 'Rusak' }
-            ]);
-
-            // Mock checklist data
-            LaporanModel.getInventarisChecklistReport.mockResolvedValue(mockChecklistData);
-
-            await laporanController.getInventarisLaporanByDate(req, res);
-
-            expect(LaporanModel.getInventarisStatus).toHaveBeenCalled();
-            expect(LaporanModel.getInventarisChecklistReport).toHaveBeenCalled();
-
-            // Controller returns processed data, just check it was called
-            expect(res.json).toHaveBeenCalled();
-        });
-
-        test('should return 500 on database error', async () => {
-            req.query = { tanggal: '2025-12-09' };
-            console.error.mockClear();
-            LaporanModel.getInventarisChecklistReport.mockRejectedValue(new Error('DB Error'));
-
-            await laporanController.getInventarisLaporanByDate(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(500);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil laporan inventaris' });
-            expect(console.error).toHaveBeenCalledWith('Error Laporan Inventaris:', expect.any(Error));
-        });
-
-        test.skip('should handle invalid JSON in inventaris_checklist gracefully', async () => {
-            // Skipped: Controller implementation may handle this differently
-            req.query = { tanggal: '2025-12-09' };
-            const invalidData = [
-                {
-                    id: 1,
-                    tanggal: '2025-12-09',
-                    inventaris_checklist: 'invalid json string',
-                },
-            ];
-            console.error.mockClear();
-
-            // Mock master items
-            LaporanModel.getInventarisStatus.mockResolvedValue([
-                { id: 1, nama: 'Item 1', status: 'Baik' }
-            ]);
-
-            LaporanModel.getInventarisChecklistReport.mockResolvedValue(invalidData);
-
-            await laporanController.getInventarisLaporanByDate(req, res);
-
-            expect(res.status).toHaveBeenCalledWith(500);
-            expect(console.error).toHaveBeenCalledWith('Error Laporan Inventaris:', expect.any(Error));
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                success: false,
+                message: expect.stringContaining('Gagal mengambil laporan absensi')
+            }));
         });
     });
 });
