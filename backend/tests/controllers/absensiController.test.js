@@ -180,6 +180,96 @@ describe('AbsensiController (OOP)', () => {
         });
     });
 
+
+    // --- Testing getChecklist ---
+    describe('getChecklist', () => {
+        const MOCK_SESSION = {
+            id: 10,
+            inventaris_checklist: JSON.stringify([{ inventaris_id: 1, status: 'Baik' }]),
+            checklist_submitted: false,
+            note: 'catatan'
+        };
+
+        test('should return existing checklist if available', async () => {
+            AbsensiModel.findCurrentActiveSession.mockResolvedValue(MOCK_SESSION);
+
+            await absensiControllerInstance.getChecklist.bind(absensiControllerInstance)(req, res);
+
+            expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                data: {
+                    absensiId: 10,
+                    checklist: [{ inventaris_id: 1, status: 'Baik' }],
+                    checklistSubmitted: false,
+                    note: 'catatan'
+                }
+            });
+        });
+
+        test('should generate new checklist if empty and update DB', async () => {
+            const SESSION_NO_CHECKLIST = { ...MOCK_SESSION, inventaris_checklist: null };
+            AbsensiModel.findCurrentActiveSession.mockResolvedValue(SESSION_NO_CHECKLIST);
+
+            const MOCK_ITEMS = [{ id: 100, kode_barang: 'B01', nama_barang: 'Sapu', status: 'Baik' }];
+            InventarisModel.findAllItems.mockResolvedValue(MOCK_ITEMS);
+            AbsensiModel.updateChecklist.mockResolvedValue(1);
+
+            await absensiControllerInstance.getChecklist.bind(absensiControllerInstance)(req, res);
+
+            // Verify it fetched items
+            expect(InventarisModel.findAllItems).toHaveBeenCalled();
+
+            // Verify it updated DB
+            expect(AbsensiModel.updateChecklist).toHaveBeenCalledWith(
+                10,
+                1, // req.user.id
+                expect.any(String), // JSON string
+                'catatan'
+            );
+
+            // Verify response
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+                success: true,
+                data: expect.objectContaining({
+                    checklist: expect.arrayContaining([
+                        expect.objectContaining({ inventaris_id: 100 })
+                    ])
+                })
+            }));
+        });
+
+        test('should handle invalid JSON in checklist', async () => {
+            const SESSION_BAD_JSON = { ...MOCK_SESSION, inventaris_checklist: '{invalid' };
+            AbsensiModel.findCurrentActiveSession.mockResolvedValue(SESSION_BAD_JSON);
+
+            // Should behave like empty checklist -> generate new
+            InventarisModel.findAllItems.mockResolvedValue([]);
+
+            await absensiControllerInstance.getChecklist.bind(absensiControllerInstance)(req, res);
+
+            expect(InventarisModel.findAllItems).toHaveBeenCalled();
+            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+        });
+
+        test('should return 404 if no active session', async () => {
+            AbsensiModel.findCurrentActiveSession.mockResolvedValue(null);
+
+            await absensiControllerInstance.getChecklist.bind(absensiControllerInstance)(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(404);
+            expect(res.json).toHaveBeenCalledWith({ message: 'Tidak ada sesi absensi aktif.' });
+        });
+
+        test('should return 500 on database error', async () => {
+            AbsensiModel.findCurrentActiveSession.mockRejectedValue(new Error('DB Error'));
+
+            await absensiControllerInstance.getChecklist.bind(absensiControllerInstance)(req, res);
+
+            expect(res.status).toHaveBeenCalledWith(500);
+            expect(res.json).toHaveBeenCalledWith({ message: 'Gagal mengambil checklist.' });
+        });
+    });
+
     // --- Testing submitChecklist ---
     describe('submitChecklist', () => {
         test('should return success message and update models', async () => {

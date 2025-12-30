@@ -164,6 +164,25 @@ describe('JadwalController - Date-based System', () => {
 
             expect(res.status).toHaveBeenCalledWith(500);
         });
+
+        test('should ignore ER_DUP_ENTRY error', async () => {
+            req.body = {
+                schedule: [
+                    { user_id: 1, tanggal: '2025-01-08', hari: 'Senin' }
+                ]
+            };
+            JadwalModel.deleteJadwalByDateRange.mockResolvedValue({ affectedRows: 0 });
+
+            const dupError = new Error('Duplicate');
+            dupError.code = 'ER_DUP_ENTRY';
+            JadwalModel.insertJadwalByDate.mockRejectedValue(dupError);
+
+            await jadwalControllerInstance.saveJadwal(req, res);
+
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ success: true, data: expect.objectContaining({ total_inserted: 0 }) })
+            );
+        });
     });
 
     describe('deleteJadwal', () => {
